@@ -4,6 +4,8 @@
 local runService = game:GetService("RunService")
 local gamebeast = {}
 
+local isServer = runService:IsServer()
+
 local remotesFolder = runService:IsClient() and script:WaitForChild("Remotes") or Instance.new("Folder", script)
 remotesFolder.Name = "Remotes"
 
@@ -14,7 +16,7 @@ local function checkGBReady()
 end
 
 local function getRemote(remoteType : "Function" | "Event", name : string)
-	local remote = remotesFolder:FindFirstChild(remoteType..name)
+	local remote = isServer and remotesFolder:FindFirstChild(remoteType..name) or remotesFolder:WaitForChild(remoteType..name)
 	if not remote then
 		remote = Instance.new("Remote"..remoteType, remotesFolder)
 		remote.Name = remoteType..name
@@ -25,8 +27,13 @@ end
 
 -- Everything implemented as functions, most devs use method syntax, so expose accordingly
 
+
+gamebeast.GetRemote = function(_, ...)
+	return getRemote(...)
+end
+
 -- Server sided functions
-if runService:IsServer() then	
+if isServer then	
 	-- Configs
 	gamebeast.Get = function(_, ...)
 		checkGBReady()
@@ -57,10 +64,6 @@ if runService:IsServer() then
 else
 	-- Client sided functions
 	
-	gamebeast.GetRemote = function(_, ...)
-		return getRemote(...)
-	end
-
 	-- Configs
 	gamebeast.Get = function(_, ...)
 		checkGBReady()
