@@ -22,7 +22,7 @@ end
 -- Function to get client info for session data and other telemetry
 -- Consider renaming for clarity
 
-gamebeastModule:GetRemote("Function", "GetClientInfo").GetClientInfo.OnClientInvoke = function()
+gamebeastModule:GetRemote("Function", "GetClientInfo").OnClientInvoke = function()
 	return {
 		deviceType = getPlayerDeviceType()
 	}

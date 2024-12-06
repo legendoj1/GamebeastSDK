@@ -9,7 +9,6 @@ local localizationService = game:GetService("LocalizationService")
 local policyService = game:GetService("PolicyService")
 
 local sdk = script.Parent.Parent.Parent
-
 local utilities = shared.GBMod("Utilities")
 local gamebeastMod = require(replicatedStorage:WaitForChild("Gamebeast"))
 
@@ -57,7 +56,7 @@ markerMod.sendMarkers = function()
 			if data["GBReserved"][markerType] then
 				table.insert(data["GBReserved"][markerType], marker)
 			else
-				table.insert(data["general"], marker)
+				table.insert(data["general"].markers, marker)
 			end
 		end
 		
@@ -74,29 +73,37 @@ markerMod.sessionIDs = {}
 
 -- Core function, should be used internally by SDK rather than fireMarker
 markerMod.createMarker = function(source, markerType, player, position, value, args)
-	-- Validate all arguments.	
+	-- Validate all arguments.
+	local usageStr
+	
+	if source == "server" then
+		usageStr = "Usage: FireMarker(MarkerType, Player (optional), Position (optional),  Value (optional), Args (optional))"
+	elseif source == "client" then
+		usageStr = "Usage: FireMarker(MarkerType, Position (optional), Value (optional), Args (optional))"
+	end
+	
 	if typeof(markerType) ~= "string" then
 		utilities.GBWarn("MarkerType argument should be a string.")
 		return
 	end
 	
 	if player ~= nil and not (player:IsA("Player") or typeof(player) == "number") then
-		utilities.GBWarn("Player argument for marker should be a player instance, string/numeric identifier, or nil.")
+		utilities.GBWarn("Player argument for ".. source .." marker \"".. markerType.."\" should be a player instance, string/numeric identifier, or nil.\n".. usageStr)
 		return
 	end
 	
 	if position ~= nil and typeof(position) ~= "Vector3" then
-		utilities.GBWarn("Position arugment for marker should be Vector3 or nil.")
-		return
-	end
-		
-	if args ~= nil and typeof(args) ~= "table" or (typeof(args) == "table" and #args > 0) then
-		utilities.GBWarn("Args for marker should be a key-value dictionary or nil.")
+		utilities.GBWarn("Position arugment for ".. source .." marker \"".. markerType.."\" should be Vector3 or nil.\n".. usageStr)
 		return
 	end
 	
 	if value ~= nil and typeof(value) ~= "number" then
-		utilities.GBWarn("Value agrument for marker must be a number or nil. Use \"args\" for other data types.")
+		utilities.GBWarn("Value agrument for ".. source .." marker \"".. markerType.."\" must be a number or nil. Use \"args\" for other data types.\n".. usageStr)
+		return
+	end
+	
+	if args ~= nil and typeof(args) ~= "table" or (typeof(args) == "table" and #args > 0) then
+		utilities.GBWarn("Args for ".. source .." marker \"".. markerType.."\" should be a key-value dictionary or nil.\n".. usageStr)
 		return
 	end
 	
@@ -107,7 +114,7 @@ markerMod.createMarker = function(source, markerType, player, position, value, a
 		userId = player.UserId
 	end
 	
-	--local partition = shared.GBMod("ABTesting").CUR_PARTITION
+	--local partition = shared.GBMod("A/BTesting").CUR_PARTITION
 	
 	-- Marker fields
 	local entry = {
@@ -138,7 +145,7 @@ markerMod.createMarker = function(source, markerType, player, position, value, a
 			-- Round positions to avoid sending 14 decimals of accuracy across wire
 			
 			if not heatmapMetadata.center and not systemMarkers[markerType] then
-				utilities.GBWarn("A heatmap must be defined for position information to be included with markers.")
+				--utilities.GBWarn("A heatmap must be defined for position information to be included with markers.")
 			elseif heatmapMetadata.center then
 				-- Localize position
 				local center, size = heatmapMetadata.center, heatmapMetadata.size
@@ -164,6 +171,7 @@ end
 
 -- Used internally by SDK to create markers
 markerMod.sdkMarker = function(...)
+	-- CHANGE TO "sdk"
 	markerMod.createMarker("sdk", ...)
 end
 

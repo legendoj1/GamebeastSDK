@@ -14,6 +14,9 @@ local gamebeastModule = require(gamebeastModInstance)
 
 local updaterMod = {}
 
+local configChangedRemote = gamebeastModule:GetRemote("Event", "ConfigChanged")
+local moduleUpdatedRemote = gamebeastModule:GetRemote("Event", "ModuleUpdated")
+
 -- Datastore to get last configs if we can't communicate with GB servers
 local BACKUP_STORE_KEY = "GBConfigBackup"
 updaterMod.backupConfigStore = dataStoreService:GetDataStore(BACKUP_STORE_KEY)
@@ -74,14 +77,14 @@ updaterMod.updateConfigs = function(newConfigs, init)
 	-- Signal mod update
 	if not init then
 		updaterMod.ModuleUpdated:Fire()
-		gamebeastModule:GetRemote("Event", "ModuleUpdated"):FireAllClients()
+		moduleUpdatedRemote:FireAllClients()
 	end
 end
 
 -- Send update signal to specific config branch
 local function sendConfigUpdateSignal(path, newValue, oldValue, notifyClient)
 	updaterMod.ConfigChanged:Fire(path, newValue, oldValue)
-	gamebeastModule:GetRemote("Event", "ConfigChanged"):FireAllClients(path, newValue, oldValue)
+	configChangedRemote:FireAllClients(path, newValue, oldValue)
 end
 
 ---- Checks whether given path value (evaluated, not by reference) has changed between two sets of configs. Returns whether config changed.

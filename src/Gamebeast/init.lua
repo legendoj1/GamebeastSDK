@@ -16,7 +16,7 @@ local function checkGBReady()
 end
 
 local function getRemote(remoteType : "Function" | "Event", name : string)
-	local remote = isServer and remotesFolder:FindFirstChild(remoteType..name) or remotesFolder:WaitForChild(remoteType..name)
+	local remote = if isServer then remotesFolder:FindFirstChild(remoteType..name) else remotesFolder:WaitForChild(remoteType..name)
 	if not remote then
 		remote = Instance.new("Remote"..remoteType, remotesFolder)
 		remote.Name = remoteType..name
@@ -49,6 +49,7 @@ if isServer then
 	end
 	
 	gamebeast.CopyConfigs = function(_, ...)
+		checkGBReady()
 		return shared.GBMod("Configs").copyConfigs(...)
 	end
 	
