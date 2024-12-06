@@ -5,7 +5,6 @@ local replicatedStorage = game:GetService("ReplicatedStorage")
 local sdk = script.Parent.Parent.Parent
 
 local utilities = shared.GBMod("Utilities")
-local updater = shared.GBMod("Updater")
 local gamebeastMod = require(replicatedStorage:WaitForChild("Gamebeast"))
 
 local configsMod = {}
@@ -62,7 +61,7 @@ end
 -- NOTE: need to add client arg and make sure path exists in client config set
 configsMod.onChanged = function(path, callback)
 	-- Establish bindable connection
-	local connection = updater.ConfigChanged:Connect(function(changedPath, newValue, oldValue)
+	local connection = shared.GBMod("Updater").ConfigChanged:Connect(function(changedPath, newValue, oldValue)
 		local isMatchingTable
 
 		if typeof(path) == "table" and typeof(changedPath) == "table" then
@@ -81,7 +80,7 @@ end
 -- Fires event when a newer configuration module is received from the Roblox website.
 -- Usage: local connection = configs.moduleUpdated(function() end)
 configsMod.moduleUpdated = function(callback)
-	return updater.ModuleUpdated:Connect(callback)
+	return shared.GBMod("Updater").ModuleUpdated:Connect(callback)
 end
 
 -- Follow provided path to get value, directly or nested
