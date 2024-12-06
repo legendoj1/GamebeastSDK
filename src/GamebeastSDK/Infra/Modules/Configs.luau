@@ -31,12 +31,13 @@ configsMod.get = function(path, configs)
 		return nil
 	end
 	
-	if configsMod.checkPathExists(path, configs) then
-		local location, lastKey = configsMod.getEndpointFromPath(path, configs)
-		return location[lastKey]
+	local location, lastKey = configsMod.getEndpointFromPath(path, configs)
+
+	if not location or not lastKey then
+		return nil
 	end
 	
-	return nil
+	return location[lastKey]
 end
 
 -- Get the configuration list for a live event
@@ -95,32 +96,14 @@ configsMod.getEndpointFromPath = function(path, configs)
 	local endpoint = configsMod.get(path[1], configs)
 
 	for i = 2, #path - 1 do
+		if not endpoint then
+			return nil, nil
+		end
+
 		endpoint = endpoint[path[i]]
 	end
 
 	return endpoint, path[#path]
-end
-
--- Check if provided path exists in provided configurations.
--- Config is specified path, configs is set of configurations to iterate over. Can be different from current server configurations.
-configsMod.checkPathExists = function(path, configs)
-	if not (typeof(path) == "table") then
-		return (configs and configs[path] or configsMod.configs[path]) and true or false
-	elseif #path == 1 then
-		return (configs and configs[path[1]] or configsMod.configs[path[1]]) and true or false
-	end
-
-	local endpoint = configsMod.get(path[1])
-
-	for i = 2, #path - 1 do
-		if not endpoint then
-			return false
-		end
-		
-		endpoint = endpoint[path[i]]
-	end
-
-	return endpoint and true or false
 end
 
 -- For receiving and handling client requests
@@ -128,17 +111,17 @@ local getRemoteFunc = gamebeastMod:GetRemote("Function", "Get")
 local getEventDataRemoteFunc = gamebeastMod:GetRemote("Function", "GetEventData")
 
 -- Call Get for clients and return value.
-getRemoteFunc.OnServerInvoke = function(player, ...)
-	return configsMod.get(...)
+getRemoteFunc.OnServerInvoke = function(player, path)
+	return configsMod.get(path)
 	-- NOTE: We'll want to modify to reflect privacy. To be most efficient, we can create a get function that references a
 	-- "client" config set that essentially recursively copies the set of configs only assigning a value if it has client accessibility.
-	-- This means we only every make one copy of a table rather than on every client request. 
-	--return configsMod.get(..., configsMod.clientConfigs)	
+	-- This means we only every make one copy of a table rather than on every client request.
+	--return configsMod.get(path, configsMod.clientConfigs)
 end
 
 -- Call GetEventData for clients and return value
-getEventDataRemoteFunc.OnServerInvoke = function(player, ...)
-	return configsMod.getEventData(...)	
+getEventDataRemoteFunc.OnServerInvoke = function(player, eventName)
+	return configsMod.getEventData(eventName)
 end
 
 return configsMod
