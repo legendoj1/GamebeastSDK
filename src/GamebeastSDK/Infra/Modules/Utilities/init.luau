@@ -1,0 +1,152 @@
+-- The Gamebeast SDK is Copyright © 2023 Gamebeast, Inc. to present.
+-- All rights reserved.
+
+local replicatedStorage = game:GetService("ReplicatedStorage")
+local marketplaceService = game:GetService("MarketplaceService")
+local messagingService = game:GetService("MessagingService")
+
+local gamebeastModInstance = replicatedStorage:WaitForChild("Gamebeast")
+local gamebeastModule = require(gamebeastModInstance)
+
+local sdk = script.Parent.Parent.Parent
+local tweenMod = require(script.Tween)
+local settingsMod = require(sdk.Settings)
+
+local utilities = {}
+
+-- Central function for warning messages across SDK. Indicates Gamebeast as warning source and allows for output settings.
+utilities.GBWarn = function(message)
+	if settingsMod.sdkWarningsEnabled then
+		if settingsMod.includeWarningStackTrace then
+			message = debug.traceback("GamebeastSDK: ".. message)
+		else
+			message = "GamebeastSDK: ".. message
+		end
+		
+		warn(message)
+	end
+end
+
+-- pcall wrapper function with retry support used extensively in SDK.
+utilities.promiseReturn = function(maxRetries, callback, retries)
+	if maxRetries and not retries then
+		retries = 0
+	elseif retries and retries > maxRetries then
+		--warn("Promise reached retry limit")
+		return nil, false
+	end
+
+	local result
+
+	local success, err = pcall(function()
+		result = callback()
+	end)
+
+	if success then
+		return result, true
+	else
+		task.wait()
+		if retries then
+			retries += 1
+			
+			if retries > maxRetries then
+				utilities.GBWarn(err)
+			end
+		end
+
+		return utilities.promiseReturn(maxRetries, callback, retries)
+	end
+end
+
+-- Check contents of two tables are the same without recursive iteration
+-- Works only if we want to check key-value equivalence, and not type, table memory reference, etc. Works for SDK purposes *today*.
+utilities.tableEqualityCheck = function(a, b)
+	return table.concat(a) == table.concat(b)
+end
+
+-- Format time in seconds to specified format
+utilities.formatTime = function(timeRemaining, onlyMinutes)	
+	local hours = math.floor(timeRemaining/60/60)
+	local minutes = math.floor((timeRemaining/60) - (hours * 60))
+	local seconds = math.floor(timeRemaining - (minutes * 60) - (hours * 60 * 60))
+
+	hours = tostring(hours)
+	minutes = tostring(minutes)
+	seconds = tostring(seconds)
+
+	if #hours < 2 then
+		hours = "0".. hours
+	end
+	if #minutes < 2 then
+		minutes = "0".. minutes
+	end
+	if #seconds < 2 then
+		seconds = "0".. seconds
+	end
+
+	return onlyMinutes and minutes.. ":".. seconds or hours.. ":".. minutes.. ":".. seconds
+end
+
+-- Convert seconds to time remaining in specified format
+utilities.convertSecstoDay = function(timeRemaining) 
+	local days = timeRemaining / (24 * 3600)
+
+	timeRemaining = timeRemaining % (24 * 3600)
+	
+	local hours = timeRemaining / 3600
+
+	timeRemaining %= 3600
+	
+	local minutes = timeRemaining / 60
+
+	timeRemaining %= 60
+	
+	local seconds = timeRemaining
+
+	return math.floor(days).. "d ".. math.floor(hours).. "h ".. math.floor(minutes).. "m ".. math.floor(seconds).. "s"
+end 
+
+-- Get product info with promise wrapper
+utilities.getProductInfo = function(id, infoType)
+	return utilities.promiseReturn(nil, function()
+		return marketplaceService:GetProductInfo(id, infoType)
+	end)
+end
+
+-- Recursive deep copy of a given table
+utilities.recursiveCopy = function(tab, readOnly)
+	local tableCopy = {}
+
+	for index, value in tab do
+		if type(value) == "table" then
+			value = utilities.recursiveCopy(value, readOnly)
+			
+			if readOnly and not table.isfrozen(value) then
+				table.freeze(value)
+			end
+		end
+
+		tableCopy[index] = value
+	end
+
+	return tableCopy
+end
+
+-- Round num to nearest specified increment. Roblox changes may have made less numerically stable, resulting in some odd floating point errors in limited instances
+utilities.roundNum = function(num, nearest) 
+	return math.floor(0.5 + (num/nearest)) / (1/nearest)
+end
+
+-- Publish message with messaging service with promise wrapper. All MessageService messages go through here for potential usage monitoring.
+utilities.publishMessage = function(channel, message)
+	utilities.promiseReturn(1, function()
+		messagingService:PublishAsync(channel, message)
+	end)
+end
+
+-- Get player device/platform type
+utilities.getPlayerDeviceType = function(player)
+	return gamebeastModule:GetRemote("Function", "GetClientInfo"):InvokeClient(player).deviceType
+end
+
+return utilities
