@@ -65,6 +65,7 @@ local requestMethodMap = {
 	["sdk/roblox/configurations"] = "GET",
 	["sdk/roblox/markers"] = "POST",
 	["sdk/roblox/heatmap"] = "POST",
+	["sdk/roblox/heatmap/waypoint"] = "POST",
 }
 
 -- If no keys module, abort - we can't communicate with backend without keys
@@ -82,7 +83,7 @@ local keyWarningGiven = false
 
 -- Main method for dispatching requests from SDK to backend
 -- Returns parsed body and original response if body can be resolve and response only otherwise
-requestsMod.GBRequest = function(requestType, args, maxRetries)
+requestsMod.GBRequest = function(requestType : string, args : {[string] : any}, maxRetries : number?)
 	local requestMethod = requestMethodMap[requestType]
 	local response, body
 	args = args or {}
