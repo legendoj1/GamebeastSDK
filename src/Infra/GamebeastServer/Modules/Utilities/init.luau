@@ -5,10 +5,11 @@ local replicatedStorage = game:GetService("ReplicatedStorage")
 local marketplaceService = game:GetService("MarketplaceService")
 local messagingService = game:GetService("MessagingService")
 
-local gamebeastModInstance = replicatedStorage:WaitForChild("Gamebeast")
-local gamebeastModule = require(gamebeastModInstance)
+local GetRemote = shared.GBMod("GetRemote")
 
-local sdk = script.Parent.Parent.Parent
+local ClientInfoRemote = GetRemote("Function", "GetClientInfo")
+
+local sdk = script.Parent.Parent.Parent.Parent
 local tweenMod = require(script.Tween)
 local settingsMod = require(sdk.Settings)
 
@@ -146,7 +147,7 @@ end
 
 -- Get player device/platform type
 utilities.getPlayerDeviceType = function(player)
-	return gamebeastModule:GetRemote("Function", "GetClientInfo"):InvokeClient(player).deviceType
+	return ClientInfoRemote:InvokeClient(player).deviceType
 end
 
 return utilities

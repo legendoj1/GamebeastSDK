@@ -1,4 +1,4 @@
 # Roblox Studio lock files
 /*.rbxlx.lock
 /*.rbxl.lock
-/src/GamebeastSDK/Keys.lua
+/src/Keys.lua

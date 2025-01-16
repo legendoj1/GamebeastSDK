@@ -3,17 +3,10 @@
   "tree": {
     "$className": "DataModel",
 
-    "ReplicatedStorage": {
-      "$className": "ReplicatedStorage",
-      "Gamebeast": {
-        "$path": "src/Gamebeast"
-      }
-    },
-
     "ServerScriptService": {
       "$className": "ServerScriptService",
       "GamebeastSDK": {
-        "$path": "src/GamebeastSDK"
+        "$path": "src"
       }
     }
   }

@@ -6,7 +6,7 @@ local messagingService = game:GetService("MessagingService")
 local httpService = game:GetService("HttpService")
 local chatService = game:GetService("Chat")
 
-local utilities = require(script.Parent.Parent.Utilities)
+local utilities = shared.GBMod("Utilities")
 
 -- Header comments provide info on request details sent from backend.
 
@@ -136,7 +136,7 @@ requestFunctions.funcs = {
 	-- host_only: false
 	-- async: false
 	["UpdateConfigs"] = function(request)
-		shared.GBMod("Updater").updateConfigs(request.args)
+		shared.GBMod("Updater"):UpdateConfigs(request.args)
 		
 		if shared.GBMod("HostServer").isHostServer() then
 			shared.GBMod("GBRequests").sendSuccess(request, {})

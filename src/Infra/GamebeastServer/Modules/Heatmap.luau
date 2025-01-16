@@ -13,7 +13,6 @@
 local Heatmap = { }
 
 --= Roblox Services =--
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 --= Dependencies =--
 
@@ -48,7 +47,7 @@ end
 --= API Functions =--
 
 function Heatmap:RegisterHeatmap(name : string, positionA : Vector3, positionB : Vector3)
-    GBRequests.GBRequest("sdk/roblox/heatmap", {
+    GBRequests.GBRequest("sdk/heatmap", {
         ["name"] = name,
         ["positionA"] = RoundVector3(positionA),
         ["positionB"] = RoundVector3(positionB)
@@ -68,7 +67,7 @@ function Heatmap:AddHeatmapWaypoint(heatmapName : string, waypointName : string,
     -- Convert color3 to hex
     appearanceInfo.color = appearanceInfo.color:ToHex()
     
-    GBRequests.GBRequest("sdk/roblox/heatmap/waypoint", {
+    GBRequests.GBRequest("sdk/heatmap/waypoint", {
         ["heatmapName"] = heatmapName,
         ["waypointName"] = waypointName,
         ["position"] = RoundVector3(position),

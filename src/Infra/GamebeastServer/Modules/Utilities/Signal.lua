@@ -31,6 +31,14 @@ function Signal:Connect(callback : (any) -> ())
     return self._bindable.Event:Connect(callback)
 end
 
+function Signal:Once(callback : (any) -> ())
+    self._bindable.Event:Once(callback)
+end
+
+function Signal:Wait()
+    return self._bindable.Event:Wait()
+end
+
 function Signal:Fire(...)
     self._bindable:Fire(...)
 end

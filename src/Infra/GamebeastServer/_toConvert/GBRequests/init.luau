@@ -6,9 +6,9 @@ local messagingService = game:GetService("MessagingService")
 local httpService = game:GetService("HttpService")
 local runService = game:GetService("RunService")
 
-local sdk = script.Parent.Parent.Parent
+local sdk = script.Parent.Parent.Parent.Parent
 local utilities = shared.GBMod("Utilities")
-local queue = require(script.Parent.Utilities.Queue)
+local Queue = shared.GBMod("Queue")
 local requestFunctions = require(script.RequestFunctions)
 local requestsMod = {}
 
@@ -43,7 +43,7 @@ requestsMod.asyncResultQueue = {}
 requestsMod.requestProcessIdMap = {}
 
 -- For processing requests in the order received
-requestsMod.requestQueue = queue.new()
+requestsMod.requestQueue = Queue.new()
 
 -- Short term cache for request results to avoid reprocessing repeatedly sent requests
 requestsMod.resultCacheMap = {}
@@ -51,22 +51,33 @@ requestsMod.resultCacheMap = {}
 -- Request dispatcher
 
 -- Primary API
-local GBDomain = "https://api.dev.gamebeast.gg"
 
--- Endpoint to method map
-local requestMethodMap = {
-	["users/create"] = "POST",
-	["health_check"] = "GET",
-	["jobs/create"] = "POST",
-	["requests"] = "GET",
-	["requests/completed"] = "POST",
-	["requests/started"] = "PUT",
-	["application/boot_info"] = "GET",
-	["sdk/roblox/configurations"] = "GET",
-	["sdk/roblox/markers"] = "POST",
-	["sdk/roblox/heatmap"] = "POST",
-	["sdk/roblox/heatmap/waypoint"] = "POST",
+local Endpoints = {
+	{
+		URL = "http://localhost:3001", -- https://api.gamebeast.gg -- https://api.stage.gamebeast.gg
+		Requests = {
+			["sdk/markers"] = "POST",
+			["users/create"] = "POST",
+			["health_check"] = "GET",
+			["jobs/create"] = "POST",
+			["sdk/requests"] = "GET",
+			["sdk/requests/completed"] = "POST",
+			["sdk/requests/started"] = "PUT",
+			["application/boot_info"] = "GET",
+			["sdk/configurations"] = "GET",
+			["sdk/heatmap"] = "POST",
+			["sdk/heatmap/waypoint"] = "POST",
+		}
+	}
 }
+
+local function GetEndpointForRequest(requestType) : (string?, string?)
+	for _, endpoint in Endpoints do
+		if endpoint.Requests[requestType] then
+			return endpoint.URL, endpoint.Requests[requestType]
+		end
+	end
+end
 
 -- If no keys module, abort - we can't communicate with backend without keys
 if not sdk:FindFirstChild("Keys") then
@@ -84,12 +95,12 @@ local keyWarningGiven = false
 -- Main method for dispatching requests from SDK to backend
 -- Returns parsed body and original response if body can be resolve and response only otherwise
 requestsMod.GBRequest = function(requestType : string, args : {[string] : any}, maxRetries : number?)
-	local requestMethod = requestMethodMap[requestType]
+	local GBDomain, requestMethod = GetEndpointForRequest(requestType)
 	local response, body
 	args = args or {}
-	
+
 	local partition = shared.GBMod("ABTesting").CUR_PARTITION
-	
+
 	-- Define relevant headers. Backend enforces header presence unless specified.
 	local headers = {
 		["authorization"] = projectKey,
@@ -99,14 +110,14 @@ requestsMod.GBRequest = function(requestType : string, args : {[string] : any}, 
 		-- optional, to be removed with A/B testing overhaul
 		["partitionid"] = partition ~= "" and partition or nil,
 	}
-	
+
 	-- JobId is undefined in studio so send a hard coded default for this environment
 	if headers["isstudio"] then
 		headers["serverid"] = "00000000-0000-0000-0000-000000000000"
 	else
 		headers["serverid"] = game.JobId
 	end
-	
+
 	local url = GBDomain.. "/".. requestType
 
 	if requestMethod == "POST" or requestMethod == "PUT" then
@@ -118,11 +129,11 @@ requestsMod.GBRequest = function(requestType : string, args : {[string] : any}, 
 		for key, val in args do
 			paramString ..= key.. "=".. httpService:UrlEncode(val).. "&"
 		end
-		
+
 		paramString = string.sub(paramString, 1, #paramString - 1)
 		url ..= paramString
 	end
-		
+
 	-- Send request
 	response = utilities.promiseReturn(maxRetries or 1, function()
 		return httpService:RequestAsync({
@@ -138,33 +149,33 @@ requestsMod.GBRequest = function(requestType : string, args : {[string] : any}, 
 			utilities.GBWarn("Gamebeast project key invalid or not set! Set your project key in the Keys module.")
 			keyWarningGiven = true
 		end
-		
+
 		-- Decode returned body
 		--print(results)
 		local bodyParsed, success = utilities.promiseReturn(0, function()
 			return httpService:JSONDecode(response.Body)
 		end)
-		
+
 		return bodyParsed, response
 	end
-	
+
 	return response
 end
 
 -- Handles adding of new requests into request pipeline
 requestsMod.addRequestsToQueue = function(newRequests)
 	for _, request in newRequests do
-		if request.details.host_only and not request.details.host_authority and not shared.GBMod("HostServer").isHostServer() then
+		if request.details.hostOnly and not request.details.host_authority and not shared.GBMod("HostServer").isHostServer() then
 			continue
 		end
-		
+
 		local cachedResult
-		
+
 		-- Check if we already have a result for this request and it's been erroneously resent
-		if requestsMod.resultCacheMap[request.request_id] then
-			cachedResult = requestsMod.resultCacheMap[request.request_id].result
+		if requestsMod.resultCacheMap[request.requestId] then
+			cachedResult = requestsMod.resultCacheMap[request.requestId].result
 		end
-		
+
 		-- Resend result across the network in case of previously failed delivery from SDK or if delayed/duplicated request
 		if cachedResult then
 			requestsMod.addResultToAsyncQueue(cachedResult)
@@ -172,9 +183,9 @@ requestsMod.addRequestsToQueue = function(newRequests)
 		end
 
 		-- If this event isn't already being processed, then add to queue and add tracking state info
-		if not requestsMod.requestQueueIdMap[request.request_id] then
+		if not requestsMod.requestQueueIdMap[request.requestId] then
 			requestsMod.requestQueue:push(request)
-			requestsMod.requestQueueIdMap[request.request_id] = os.time()
+			requestsMod.requestQueueIdMap[request.requestId] = os.time()
 		end
 	end
 end
@@ -184,24 +195,24 @@ requestsMod.addResultToAsyncQueue = function(result)
 	table.insert(requestsMod.asyncResultQueue, result)
 end
 
--- Cleans up requests after processing. Can be request or result, just needs request_id field.
+-- Cleans up requests after processing. Can be request or result, just needs requestId field.
 requestsMod.sendRequestResults = function(results)
 	-- Sent once per batch
-	requestsMod.GBRequest("requests/completed", results)
+	requestsMod.GBRequest("sdk/requests/completed", results)
 
 	for _, result in results do
-		local id = result.request_id
-		
+		local id = result.requestId
+
 		-- Cache result to avoid reprocessing in the event of a delayed/duplicated request across the network
 		requestsMod.resultCacheMap[id] = {
 			result = result;
 			timeSubmitted = os.time();
 		}
-		
+
 		-- Remove state about this request currently being processed
 		requestsMod.requestQueueIdMap[id] = nil
 		requestsMod.requestProcessIdMap[id] = nil
-		
+
 		-- Remove stored chunks if request was chunked via messaging service to this server from host
 		if requestBodyChunkPool[id] then
 			requestBodyChunkPool[id] = nil
@@ -212,11 +223,11 @@ end
 -- Clear old cached results from result cache
 local function clearOldCachedResults()
 	local curTime = os.time()
-	
+
 	for id, result in requestsMod.resultCacheMap do
 		if curTime - result.timeSubmitted >= CACHE_EXPIRY_TIME then
 			requestsMod.resultCacheMap[id] = nil
-			
+
 			if requestBodyChunkPool[id] then
 				requestBodyChunkPool[id] = nil
 			end
@@ -233,17 +244,17 @@ utilities.promiseReturn(nil, function()
 		for _, request in decodedRequests do
 			-- This is a request sent from the host with total message size >1KiB, meaning it was chunked for MessagingService
 			if request.chunked then
-				if not requestBodyChunkPool[request.request_id] then
-					requestBodyChunkPool[request.request_id] = {}
+				if not requestBodyChunkPool[request.requestId] then
+					requestBodyChunkPool[request.requestId] = {}
 				end
 
 				-- Add chunk to pool	
-				requestBodyChunkPool[request.request_id][request.chunk_id] = request.args
+				requestBodyChunkPool[request.requestId][request.chunk_id] = request.args
 
 				local haveAllChunks = true
 
 				for i = 1, request.chunks do
-					if not requestBodyChunkPool[request.request_id][i] then
+					if not requestBodyChunkPool[request.requestId][i] then
 						haveAllChunks = false
 						break
 					end
@@ -252,9 +263,9 @@ utilities.promiseReturn(nil, function()
 				-- If all chunks accounted for, reconstruct via concatenation and load body, continue with normal pipeline
 				if haveAllChunks then
 					local argString = ""
-					
+
 					for i = 1, request.chunks do
-						argString ..= requestBodyChunkPool[request.request_id][i]
+						argString ..= requestBodyChunkPool[request.requestId][i]
 					end
 
 					request.args = httpService:JSONDecode(argString)
@@ -267,7 +278,7 @@ utilities.promiseReturn(nil, function()
 				table.insert(newRequests, request)
 			end
 		end
-		
+
 		requestsMod.addRequestsToQueue(newRequests)
 	end)
 end)
@@ -276,7 +287,7 @@ end)
 utilities.promiseReturn(nil, function()
 	messagingService:SubscribeAsync(requestsMod.GB_RESULT_TOPIC, function(message)
 		local result = httpService:JSONDecode(message.Data)
-		
+
 		if shared.GBMod("HostServer").isHostServer()  then
 			requestsMod.addResultToAsyncQueue(result)
 		end
@@ -286,13 +297,13 @@ end)
 -- Send a failure message for a given request with arbitrary args
 requestsMod.sendFailure = function(request, result)
 	result = result or {}
-	requestsMod.addResultToAsyncQueue({request_id=request.request_id, status="failure", result=result})
+	requestsMod.addResultToAsyncQueue({requestId=request.requestId, status="failure", result=result})
 end
 
 -- Send a success message for a given request with arbitrary args
 requestsMod.sendSuccess = function(request, result)
 	result = result or {}
-	requestsMod.addResultToAsyncQueue({request_id=request.request_id, status="success", result=result})
+	requestsMod.addResultToAsyncQueue({requestId=request.requestId, status="success", result=result})
 end
 
 -- Check for new requsts and add to queue loop
@@ -306,9 +317,9 @@ task.spawn(function()
 		if not shared.GBMod("HostServer").isHostServer() then return end
 
 		-- Get requests from Gamebeast. Soon-to-be legacy?
-		local newRequests, resp = requestsMod.GBRequest("requests")
+		local newRequests, resp = requestsMod.GBRequest("sdk/requests")
 
-if not newRequests or (resp["error"] or resp["StatusCode"] ~= 200) then
+		if not newRequests or (resp["error"] or resp["StatusCode"] ~= 200) then
 			if tick() - lastReqWarning >= 10 and resp["StatusCode"] ~= 403 then
 				utilities.GBWarn("Issue getting new requests from Gamebeast dashboard. Check status.gamebeast.gg and status.roblox.com.")
 				lastReqWarning = tick()
@@ -318,43 +329,45 @@ if not newRequests or (resp["error"] or resp["StatusCode"] ~= 200) then
 
 		requestsMod.addRequestsToQueue(newRequests)
 	end
-	
-	-- Yield only if first configs/initialization not done
-	shared.GBMod("Configs").checkGBReady()
-	
-	checkForRequests()
-	
-	requestsMod.pendingJobsRan = true
-	
-	while task.wait(UPDATE_PERIOD) do
+
+	local Configs = shared.GBMod("Configs") -- RECURSIVE!
+	Configs:OnConfigsReady(function()
 		checkForRequests()
-		UPDATE_PERIOD = shared.GBMod("Configs")["GBConfigs"]["GBRates"]["CheckRequests"]
-	end
+
+		requestsMod.pendingJobsRan = true
+
+		while task.wait(UPDATE_PERIOD) do
+			checkForRequests()
+			UPDATE_PERIOD = Configs:GetActiveConfig("GBConfigs")["GBRates"]["CheckRequests"]
+		end
+	end)
+
+
 end)
 
 -- Request execution loop
 task.spawn(function()
 	while task.wait(EXECUTION_PERIOD) do		
+
 		local synchronousResults = {}
 		local isHost = shared.GBMod("HostServer").isHostServer()
 		local queueLen = requestsMod.requestQueue.len
-		
+
 		-- Iterate over queue of requests at process start time, i.e. ignore new requests getting added to queue one loop begins
 		for i = 1, queueLen do
 			local request = requestsMod.requestQueue:pop()
-			
-			if requestsMod.requestProcessIdMap[request.request_id] then
+			if requestsMod.requestProcessIdMap[request.requestId] then
 				continue
 			end
 
-			requestsMod.requestProcessIdMap[request.request_id] = os.time()
-			
+			requestsMod.requestProcessIdMap[request.requestId] = os.time()
+
 			-- Send job started message
 			if isHost then
-				requestsMod.GBRequest("requests/started", {request.request_id})
+				requestsMod.GBRequest("sdk/requests/started", {request.requestId})
 			end
-			
-			if (isHost or request.details.host_authority) and not request.details.host_only then
+
+			if (isHost or request.details.host_authority) and not request.details.hostOnly then
 				local requestString = httpService:JSONEncode(request)
 				local argsString = httpService:JSONEncode(request.args)
 
@@ -362,36 +375,36 @@ task.spawn(function()
 				if #requestString > MESSAGE_SIZE_LIMIT then
 					local request = utilities.recursiveCopy(request)
 					request.chunked = true
-					
+
 					-- Make chunks as large as possible to send fewest messages, accounting for chunk metadata we're adding too
 					local argsChunkSize = MESSAGE_SIZE_LIMIT - ((#requestString + 150) - #argsString)
-					
+
 					-- We can only chunk args, so if the request itself is larger than the limit, abort
 					if argsChunkSize <= 0 then
 						utilities.GBWarn("Request too large to chunk, aborting.")
 						requestsMod.sendFailure(request, {details="request too large to chunk"})
 						continue
 					end
-					
+
 					local argChunks = {}
 					local chunkText
 					local curIndex = 1
-					
+
 					-- Generate message chunks at determined size
 					repeat
 						chunkText = string.sub(argsString, curIndex, curIndex + argsChunkSize - 1)
 						curIndex += argsChunkSize
 						table.insert(argChunks, chunkText)
 					until #chunkText < argsChunkSize
-					
+
 					-- Let recipient servers how many chunks to expect before reconstruction
 					request.chunks = #argChunks
-					
+
 					-- Send all chunks to other servers
 					for i = 1, #argChunks do
 						request.args = argChunks[i]
 						request.chunk_id = i
-						
+
 						task.spawn(function()
 							utilities.publishMessage(requestsMod.GB_MESSAGING_TOPIC, httpService:JSONEncode({request}))
 						end)
@@ -405,9 +418,9 @@ task.spawn(function()
 			end
 
 			-- Process request
-			if not request.details.host_only or isHost or request.details.host_authority then
-				local requestFunc = requestFunctions.funcs[request.request_type]
-				
+			if not request.details.hostOnly or isHost or request.details.host_authority then
+				local requestFunc = requestFunctions.funcs[request.requestType]
+
 				-- Either run relevant function in its own thread or (potentially) yield and run sequentially as determined by request details
 				if request.details.async then
 					task.spawn(function()
@@ -415,11 +428,11 @@ task.spawn(function()
 					end)
 				else
 					local result = requestFunc(request)
-					table.insert(synchronousResults, {request_id = request.request_id, result = result})
+					table.insert(synchronousResults, {requestId = request.requestId, result = result})
 				end
 			end
 		end
-		
+
 		-- Send results to GB, results are only ever in our queue if we're host
 		-- Send synchronous results to GB
 		-- NOTE: Kind of pointless since we send any async results right after, resulting in 2 requests.
@@ -427,7 +440,7 @@ task.spawn(function()
 		if #synchronousResults > 0 then
 			requestsMod.sendRequestResults(synchronousResults)
 		end
-		
+
 		-- Send any queued async results to GB
 		if #requestsMod.asyncResultQueue > 0 then
 			local queuedResults = requestsMod.asyncResultQueue
