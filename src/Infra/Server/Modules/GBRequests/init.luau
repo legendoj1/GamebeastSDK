@@ -54,7 +54,7 @@ requestsMod.resultCacheMap = {}
 
 local Endpoints = {
 	{
-		URL = "http://localhost:3001", -- https://api.gamebeast.gg -- https://api.stage.gamebeast.gg
+		URL = "https://api.gamebeast.gg", -- http://localhost:3001 -- https://api.gamebeast.gg -- https://api.stage.gamebeast.gg
 		Requests = {
 			["sdk/markers"] = "POST",
 			["users/create"] = "POST",
