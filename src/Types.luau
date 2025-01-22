@@ -13,9 +13,12 @@ export type ClientSetupConfig = {
 	sdkSettings : SDKSettings?
 }
 
-export type JSON = {
+--NOTE: The actual JSON type doesnt get represented cleanly in Roblox's intellesense. This is a simplified version for now.
+export type JSON = any
+--[[{
     [string] : (number | string | boolean | JSON)
 } | { number | string | boolean | JSON }
+ ]]
 
 
 --// Public API Types
