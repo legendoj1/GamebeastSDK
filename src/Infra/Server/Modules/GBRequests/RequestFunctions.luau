@@ -15,7 +15,7 @@ local utilities = shared.GBMod("Utilities")
 -- async: whether this request yields other requests in the queue and returns its result immediately or is run on its own thread
 -- and the result is added to the async batch queue.
 
--- Make sure to check HostServer.isHostServer() before sending request results for host_only: false requests or risk every
+-- Make sure to check HostServer:IsHostServer() before sending request results for host_only: false requests or risk every
 -- server pinging our backend.
 -- For requests where we actually want to aggregate results from servers, publish to the GBRequests.GB_RESULT_TOPIC channel
 -- and the host will batch and report results
@@ -128,7 +128,7 @@ requestFunctions.funcs = {
 			end
 		end
 		
-		if shared.GBMod("HostServer").isHostServer() then
+		if shared.GBMod("HostServer"):IsHostServer() then
 			shared.GBMod("GBRequests").sendSuccess(request)
 		end
 	end;
@@ -138,7 +138,7 @@ requestFunctions.funcs = {
 	["UpdateConfigs"] = function(request)
 		shared.GBMod("Updater"):UpdateConfigs(request.args)
 		
-		if shared.GBMod("HostServer").isHostServer() then
+		if shared.GBMod("HostServer"):IsHostServer() then
 			shared.GBMod("GBRequests").sendSuccess(request, {})
 		end
 	end;

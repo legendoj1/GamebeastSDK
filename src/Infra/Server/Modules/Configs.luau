@@ -16,7 +16,6 @@ local Configs = { }
 
 --= Dependencies =--
 
-local GBRequests = shared.GBMod("GBRequests")
 local Utilities = shared.GBMod("Utilities")
 local GetRemote = shared.GBMod("GetRemote")
 local Signal = shared.GBMod("Signal")
@@ -27,8 +26,8 @@ local Signal = shared.GBMod("Signal")
 
 local GetConfigRemoteFunc = GetRemote("Function", "Get")
 local GetEventDataRemoteFunc = GetRemote("Function", "GetEventData")
+local EventDataUpdatedRemote = GetRemote("Event", "EventDataUpdated")
 local ConfigChangedRemote = GetRemote("Event", "ConfigChanged")
-local ModuleUpdatedRemote = GetRemote("Event", "ModuleUpdated")
 local ConfigReadySignal = Signal.new()
 local ConfigUpdatedSignal = Signal.new()
 
@@ -63,7 +62,7 @@ end
 
 --= API Functions =--
 
-function Configs:AreConfigsReady() : boolean
+function Configs:IsReady() : boolean
 	return ConfigsReady
 end
 
@@ -83,7 +82,7 @@ function Configs:WaitForConfigsReady() : true
 	return true
 end
 
-function Configs:OnConfigsUpdated(targetConfig : string | {string}, callback : (newValue : any, oldValue : any) -> ()) : RBXScriptConnection
+function Configs:OnChanged(targetConfig : string | {string}, callback : (newValue : any, oldValue : any) -> ()) : RBXScriptConnection
 
 	-- Establish bindable connection
 	return ConfigUpdatedSignal:Connect(function(changedPath, newValue, oldValue)
@@ -129,9 +128,17 @@ function Configs:_checkConfigChanged(configs, path, value) : boolean
 	return hasChanged
 end
 
+function Configs:ApplyInternalConfigs(newGBConfigs)
+	-- Split internally used metadata from dev facing configs
+	for index, value in newGBConfigs do
+		ActiveConfigs.GBConfigs[index] = value
+	end
+
+	-- Note: In the future, check to see if the event data actually changed from the internal config update.
+	--EventDataUpdatedRemote:FireAllClients(newConfigs["GBEventData"])
+end
+
 function Configs:ApplyConfigs(newConfigs, init : boolean?)
-	
-	warn("Applying configs")
 	local updatedBranches = {}
 	local oldConfigs = ActiveConfigs.DevConfigs
 	
@@ -276,8 +283,14 @@ end
 
 --= Initializers =--
 function Configs:Init()
+
 	-- Call Get for clients and return value.
-	GetConfigRemoteFunc.OnServerInvoke = function(player, path)
+	GetConfigRemoteFunc.OnServerInvoke = function(_, path)
+		self:WaitForConfigsReady()
+		if path == nil then
+			return ActiveConfigs.DevConfigs
+		end
+
 		return self:Get(path)
 		-- NOTE: We'll want to modify to reflect privacy. To be most efficient, we can create a get function that references a
 		-- "client" config set that essentially recursively copies the set of configs only assigning a value if it has client accessibility.
@@ -286,9 +299,9 @@ function Configs:Init()
 	end
 
 	-- Call GetEventData for clients and return value
-	GetEventDataRemoteFunc.OnServerInvoke = function(player, eventName)
-		return self:GetEventData(eventName)
-	end
+	--[[GetEventDataRemoteFunc.OnServerInvoke = function(_)
+		return ActiveConfigs.GBConfigs.GBEventData
+	end]]
 end
 
 --= Return Module =--

@@ -19,7 +19,7 @@ local MarketplaceService = game:GetService("MarketplaceService")
 --= Dependencies =--
 
 local Utilities = shared.GBMod("Utilities")
-local Markers = shared.GBMod("Markers") ---@module Markers
+local EngagementMarkers = shared.GBMod("EngagementMarkers") ---@module Markers
 
 --= Types =--
 
@@ -83,7 +83,7 @@ local function UpdatePlayerSpend(player, itemId, itemType)
 		pos = char.PrimaryPart.Position
 	end
 	
-	Markers:SDKMarker("Purchase", args, {player = player, position = pos})
+	EngagementMarkers:SDKMarker("Purchase", args, {player = player, position = pos})
 end
 
 --= API Functions =--

@@ -6,9 +6,9 @@ local messagingService = game:GetService("MessagingService")
 local httpService = game:GetService("HttpService")
 local runService = game:GetService("RunService")
 
-local sdk = script.Parent.Parent.Parent.Parent
 local utilities = shared.GBMod("Utilities")
 local Queue = shared.GBMod("Queue")
+local DataCache = shared.GBMod("DataCache")
 local requestFunctions = require(script.RequestFunctions)
 local requestsMod = {}
 
@@ -78,16 +78,8 @@ local function GetEndpointForRequest(requestType) : (string?, string?)
 		end
 	end
 end
-
--- If no keys module, abort - we can't communicate with backend without keys
-if not sdk:FindFirstChild("Keys") then
-	utilities.GBWarn("Keys module not found. Please click the Gamebeast plugin to fix your SDK.")
-end
-
 -- Capture key and delete module, keeping it only in stack
-local keys = require(sdk.Keys)
-local projectKey = keys.projectKey
-sdk.Keys:Destroy()
+local projectKey = DataCache:Get("Key")
 
 -- One time warning if requests are failing because of invalid/unset key
 local keyWarningGiven = false
@@ -105,7 +97,7 @@ requestsMod.GBRequest = function(requestType : string, args : {[string] : any}, 
 	local headers = {
 		["authorization"] = projectKey,
 		["isstudio"] = tostring(runService:IsStudio()),
-		["sdkversion"] = sdk:GetAttribute("Version") or "NA",
+		["sdkversion"] = "NA", --TODO: Get SDK version from attribute on SDK.
 		["universeid"] = tostring(game.GameId),
 		-- optional, to be removed with A/B testing overhaul
 		["partitionid"] = partition ~= "" and partition or nil,
@@ -165,7 +157,7 @@ end
 -- Handles adding of new requests into request pipeline
 requestsMod.addRequestsToQueue = function(newRequests)
 	for _, request in newRequests do
-		if request.details.hostOnly and not request.details.host_authority and not shared.GBMod("HostServer").isHostServer() then
+		if request.details.hostOnly and not request.details.host_authority and not shared.GBMod("HostServer"):IsHostServer() then
 			continue
 		end
 
@@ -288,7 +280,7 @@ utilities.promiseReturn(nil, function()
 	messagingService:SubscribeAsync(requestsMod.GB_RESULT_TOPIC, function(message)
 		local result = httpService:JSONDecode(message.Data)
 
-		if shared.GBMod("HostServer").isHostServer()  then
+		if shared.GBMod("HostServer"):IsHostServer()  then
 			requestsMod.addResultToAsyncQueue(result)
 		end
 	end)
@@ -314,7 +306,7 @@ task.spawn(function()
 		clearOldCachedResults()
 
 		-- Only host should be asking for requests
-		if not shared.GBMod("HostServer").isHostServer() then return end
+		if not shared.GBMod("HostServer"):IsHostServer() then return end
 
 		-- Get requests from Gamebeast. Soon-to-be legacy?
 		local newRequests, resp = requestsMod.GBRequest("sdk/requests")
@@ -350,7 +342,7 @@ task.spawn(function()
 	while task.wait(EXECUTION_PERIOD) do		
 
 		local synchronousResults = {}
-		local isHost = shared.GBMod("HostServer").isHostServer()
+		local isHost = shared.GBMod("HostServer"):IsHostServer()
 		local queueLen = requestsMod.requestQueue.len
 
 		-- Iterate over queue of requests at process start time, i.e. ignore new requests getting added to queue one loop begins

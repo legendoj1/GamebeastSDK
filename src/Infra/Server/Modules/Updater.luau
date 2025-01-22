@@ -69,19 +69,16 @@ function Updater:UpdateConfigs(newConfigs, init)
 	--print("Loading new configs from Gamebeast")
 	-- Save newly received configs to datastore for backup purposes. Only the host server needs to do this for resource considerations.
 	-- Make sure we're not initializing and saving an already backed up config.
-	if shared.GBMod("HostServer").isHostServer() and not init then
+	if shared.GBMod("HostServer"):IsHostServer() and not init then
 		task.spawn(function()
 			self:SaveConfigsToBackup(newConfigs)
 		end)
 	end
 
-	-- Split internally used metadata from dev facing configs
-	for index, value in newConfigs["GBConfigs"] do
-		GBConfigs[index] = value
-	end
+	Configs:ApplyInternalConfigs(newConfigs["GBConfigs"])
 
 	-- Update game configs
-	init = init or not Configs:AreConfigsReady()
+	init = init or not Configs:IsReady()
 
 	-- Determine whether we're using canonical config profile or A/B testing partition
 

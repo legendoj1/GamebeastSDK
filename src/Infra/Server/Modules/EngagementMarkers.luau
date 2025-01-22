@@ -2,7 +2,7 @@
 	The Gamebeast SDK is Copyright © 2023 Gamebeast, Inc. to present.
 	All rights reserved.
 	
-	Markers.luau
+	EngagementMarkers.luau
 	
 	Description:
 		No description provided.
@@ -10,7 +10,7 @@
 --]]
 
 --= Root =--
-local Markers = { }
+local EngagementMarkers = { }
 
 --= Roblox Services =--
 local Players = game:GetService("Players")
@@ -21,10 +21,11 @@ local PolicyService = game:GetService("PolicyService")
 
 --= Dependencies =--
 
+local Configs = shared.GBMod("Configs") ---@module Configs
 local GetRemote = shared.GBMod("GetRemote")
 local Utilities = shared.GBMod("Utilities")
 local PlayerStats = shared.GBMod("PlayerStats")
-local Configs = shared.GBMod("Configs") ---@module Configs
+local ServerClientInfoHandler = shared.GBMod("ServerClientInfoHandler")
 
 --= Types =--
 
@@ -65,7 +66,7 @@ local LastEventReportTime = 0
 --= API Functions =--
 
 -- Send batch to GB
-function Markers:SendMarkers()
+function EngagementMarkers:SendMarkers()
 	if #MarkerQueue > 0 then
 		LastEventReportTime = tick()
 		
@@ -99,8 +100,8 @@ function Markers:SendMarkers()
 end
 
 -- Core function, should be used internally by SDK rather than fireMarker
--- function Markers:CreateMarker(source, markerType, player, position, value)
-function Markers:CreateMarker(source : "server" | "client" | "sdk", markerType : string, value : any | {[string] : any}, metaData : {[string] : any})
+-- function EngagementMarkers:CreateMarker(source, markerType, player, position, value)
+function EngagementMarkers:_createMarker(source : "server" | "client" | "sdk", markerType : string, value : any | {[string] : any}, metaData : {[string] : any})
 	metaData = metaData or {}
 	-- Validate all arguments.
 	local usageStr
@@ -125,7 +126,7 @@ function Markers:CreateMarker(source : "server" | "client" | "sdk", markerType :
 	end
 	
 	if position ~= nil and typeof(position) ~= "Vector3" then
-		Utilities.GBWarn("Position arugment for ".. source .." marker \"".. markerType.."\" should be Vector3 or nil.\n".. usageStr)
+		Utilities.GBWarn("Position argument for ".. source .." marker \"".. markerType.."\" should be Vector3 or nil.\n".. usageStr)
 		return
 	end
 	
@@ -193,30 +194,32 @@ function Markers:CreateMarker(source : "server" | "client" | "sdk", markerType :
 	
 	-- If marker queue size limit reached then send batch
 	if #MarkerQueue >= MAX_EVENT_QUEUE_SIZE then
-		Markers:SendMarkers()
+		EngagementMarkers:SendMarkers()
 	end
 end
 
 -- Fire an engagement marker. Used by devs via API module, wraps createMarker to declare source.
--- Usage: Markers:FireMarker("LevelUp", {playerLevel = player:GetAttribute("Level")}, {player = player, position = player.Character.PrimaryPart.Position})
-function Markers:FireMarker(...)
-	self:CreateMarker("server", ...)
+-- Usage: EngagementMarkers:FireMarker("LevelUp", {playerLevel = player:GetAttribute("Level")}, {player = player, position = player.Character.PrimaryPart.Position})
+function EngagementMarkers:FireMarker(...)
+	self:_createMarker("server", ...)
 end
 
 -- Used internally by SDK to create markers
-function Markers:SDKMarker(...)
-	self:CreateMarker("sdk", ...)
+function EngagementMarkers:SDKMarker(...)
+	self:_createMarker("sdk", ...)
 end
 
 --= Initializers =--
-function Markers:Init()
+function EngagementMarkers:Init()
 	-- Handle client requests through API module
 	FireMarkerEvent.OnServerEvent:Connect(function(player, markerType, value, metaData)
 		if metaData then
 			metaData.player = player
+		else
+			metaData = {player = player}
 		end
 
-		Markers:CreateMarker("client", markerType, value, metaData)
+		EngagementMarkers:_createMarker("client", markerType, value, metaData)
 	end)
 
 	local function playerAdded(player : Player)
@@ -269,7 +272,8 @@ function Markers:Init()
 			allowed_ads = Utilities.promiseReturn(1, function()
 				return PolicyService:GetPolicyInfoForPlayerAsync(player).AreAdsAllowed
 			end),
-			device = Utilities.getPlayerDeviceType(player),
+			--TODO: Add device type to markers.
+			device = ServerClientInfoHandler:GetClientInfo(player, "deviceType") or "unknown",
 		}
 		
 		self:SDKMarker("Login", loginArgs, {player = player, position = position})
@@ -311,7 +315,7 @@ function Markers:Init()
 			local lastReportElapsed = tick() - LastEventReportTime
 
 			if lastReportElapsed >= MAX_EVENT_REPORT_TIME then
-				Markers:SendMarkers()
+				EngagementMarkers:SendMarkers()
 			end
 			
 			if Configs:WaitForConfigsReady() then
@@ -326,10 +330,10 @@ function Markers:Init()
 			-- Wait for markers from various systems to come in
 			task.wait(0.5)
 			-- Send remaining items in queue on shutdown
-			Markers:SendMarkers()
+			EngagementMarkers:SendMarkers()
 		end)
 	end
 end
 
 --= Return Module =--
-return Markers
+return EngagementMarkers

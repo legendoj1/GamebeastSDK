@@ -23,7 +23,7 @@ local LocalizationService = game:GetService("LocalizationService")
 
 local Utilities = shared.GBMod("Utilities")
 local Configs = shared.GBMod("Configs")
-local Markers = shared.GBMod("Markers") ---@module Markers
+local EngagementMarkers = shared.GBMod("EngagementMarkers") ---@module Markers
 
 --= Types =--
 
@@ -78,7 +78,7 @@ function SentimentCapture:Init()
 				["message"] = message
 			}
 	
-			Markers:SDKMarker("Chat", args, {player = player, position = position})
+			EngagementMarkers:SDKMarker("Chat", args, {player = player, position = position})
 		end)
 	end)
 	

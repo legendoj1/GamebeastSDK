@@ -1,24 +1,17 @@
 -- The Gamebeast SDK is Copyright © 2023 Gamebeast, Inc. to present.
 -- All rights reserved.
 
-local replicatedStorage = game:GetService("ReplicatedStorage")
 local marketplaceService = game:GetService("MarketplaceService")
 local messagingService = game:GetService("MessagingService")
 
-local GetRemote = shared.GBMod("GetRemote")
-
-local ClientInfoRemote = GetRemote("Function", "GetClientInfo")
-
-local sdk = script.Parent.Parent.Parent.Parent
-local tweenMod = require(script.Tween)
-local settingsMod = require(sdk.Settings)
+local DataCache = shared.GBMod("DataCache")
 
 local utilities = {}
 
 -- Central function for warning messages across SDK. Indicates Gamebeast as warning source and allows for output settings.
 utilities.GBWarn = function(message)
-	if settingsMod.sdkWarningsEnabled then
-		if settingsMod.includeWarningStackTrace then
+	if DataCache:Get("Settings").sdkWarningsEnabled then
+		if DataCache:Get("Settings").includeWarningStackTrace then
 			message = debug.traceback("GamebeastSDK: ".. message)
 		else
 			message = "GamebeastSDK: ".. message
@@ -143,11 +136,6 @@ utilities.publishMessage = function(channel, message)
 	utilities.promiseReturn(1, function()
 		messagingService:PublishAsync(channel, message)
 	end)
-end
-
--- Get player device/platform type
-utilities.getPlayerDeviceType = function(player)
-	return ClientInfoRemote:InvokeClient(player).deviceType
 end
 
 return utilities

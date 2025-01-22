@@ -13,7 +13,6 @@
 local Markers = { }
 
 --= Roblox Services =--
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 --= Dependencies =--
 
@@ -35,13 +34,12 @@ local FireMarkerEvent = GetRemote("Event", "FireMarker")
 
 --= API Functions =--
 
-function Markers:FireMarker(markerType : string, value : number | {[string] : any}, metaData : {[string] : any})
-    FireMarkerEvent:FireServer(markerType, value, metaData)
+function Markers:SendMarker(markerType : string, value : number | {[string] : any}, position : Vector3?)
+    FireMarkerEvent:FireServer(markerType, value, {position = position})
 end
 
---= Initializers =--
-function Markers:Init()
-    
+function Markers:SendPlayerMarker(...)
+    error("SendPlayerMarker can only be used on the Server")
 end
 
 --= Return Module =--

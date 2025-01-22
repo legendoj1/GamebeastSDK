@@ -2,7 +2,7 @@
     The Gamebeast SDK is Copyright © 2023 Gamebeast, Inc. to present.
     All rights reserved.
     
-    DeviceType.lua
+    ClientInfoHandler.lua
     
     Description:
         No description provided.
@@ -10,7 +10,7 @@
 --]]
 
 --= Root =--
-local DeviceType = { }
+local ClientInfoHandler = { }
 
 --= Roblox Services =--
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -24,6 +24,8 @@ local GetRemote = shared.GBMod("GetRemote")
 
 --= Object References =--
 
+local ClientInfoRemote = GetRemote("Event", "ClientInfoChanged")
+
 --= Constants =--
 
 --= Variables =--
@@ -34,7 +36,7 @@ local GetRemote = shared.GBMod("GetRemote")
 
 --= API Functions =--
 
-function DeviceType:Get() : string
+function ClientInfoHandler:GetDeviceType() : string
     if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
 		return "mobile"
 	elseif UserInputService.GamepadEnabled and not UserInputService.KeyboardEnabled then
@@ -47,13 +49,11 @@ function DeviceType:Get() : string
 end
 
 --= Initializers =--
-function DeviceType:Init()
-    GetRemote("Function", "GetClientInfo").OnClientInvoke = function()
-        return {
-            deviceType = self:Get()
-        }
-    end
+function ClientInfoHandler:Init()
+    ClientInfoRemote:FireServer(nil, {
+        deviceType = self:GetDeviceType()
+    })
 end
 
 --= Return Module =--
-return DeviceType
+return ClientInfoHandler
