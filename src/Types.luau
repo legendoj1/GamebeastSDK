@@ -5,7 +5,7 @@ type SDKSettings = {
 	includeWarningStackTrace : boolean,
 }
 export type ServerSetupConfig = {
-	key : string,
+	key : string | Secret,
 	sdkSettings : SDKSettings?
 }
 

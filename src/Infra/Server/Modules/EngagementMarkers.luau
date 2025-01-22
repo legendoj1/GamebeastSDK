@@ -211,7 +211,8 @@ end
 
 --= Initializers =--
 function EngagementMarkers:Init()
-	-- Handle client requests through API module
+	--NOTE: Firing markers from client is disabled. Shifting responsibility to the developer for security.
+	--[[ Handle client requests through API module
 	FireMarkerEvent.OnServerEvent:Connect(function(player, markerType, value, metaData)
 		if metaData then
 			metaData.player = player
@@ -220,7 +221,7 @@ function EngagementMarkers:Init()
 		end
 
 		EngagementMarkers:_createMarker("client", markerType, value, metaData)
-	end)
+	end)]]
 
 	local function playerAdded(player : Player)
 		local userId = player.UserId
