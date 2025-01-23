@@ -10,16 +10,6 @@
       }
     },
 
-    "StarterPlayer": {
-      "$className": "StarterPlayer",
-      "StarterPlayerScripts": {
-        "$className": "StarterPlayerScripts",
-        "StartTest": {
-          "$path": "tests/StartTest.client.luau"
-        }
-      }
-    },
-
     "ServerScriptService": {
       "$className": "ServerScriptService",
       "StartTest": {
