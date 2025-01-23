@@ -74,7 +74,6 @@ function InternalConfigs:OnConfigsReady(callback : () -> ())
 	end
 end
 
----@deprecated Use InternalConfigs:OnConfigsReady instead.
 function InternalConfigs:WaitForConfigsReady() : true
 	if not ConfigsReady then
 		ConfigReadySignal:Wait()
@@ -237,6 +236,8 @@ function InternalConfigs:Get(path : string | { string }, configs : any) : any
 		return nil
 	end
 	
+	self:WaitForConfigsReady()
+
 	local location, lastKey = self:GetEndpointFromPath(path, ActiveConfigs.DevConfigs)
 
 	if not location or not lastKey then

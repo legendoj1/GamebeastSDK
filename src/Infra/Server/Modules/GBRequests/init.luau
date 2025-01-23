@@ -78,24 +78,50 @@ local function GetEndpointForRequest(requestType) : (string?, string?)
 		end
 	end
 end
--- Capture key and delete module, keeping it only in stack
-local projectKey = DataCache:Get("Key")
+
+local KeyYeildWarning = false
+
+local function YeildForKey() : string | Secret
+	local start = tick()
+	while not DataCache:Get("Key") do
+		task.wait()
+		if tick() - start > 5 and not KeyYeildWarning then
+			utilities.GBWarn("Gamebeast key not found! Did you call Gamebeast:Setup()?")
+			KeyYeildWarning = true
+			break
+		end
+	end
+
+	return DataCache:Get("Key")
+end
 
 -- One time warning if requests are failing because of invalid/unset key
 local keyWarningGiven = false
 
 -- Main method for dispatching requests from SDK to backend
 -- Returns parsed body and original response if body can be resolve and response only otherwise
-requestsMod.GBRequest = function(requestType : string, args : {[string] : any}, maxRetries : number?)
+requestsMod.GBRequest = function(requestType : string, ...) : nil
+	local _, requestsMethod = GetEndpointForRequest(requestType)
+	if requestsMethod ~= "POST" then
+		utilities.GBWarn("GBRequest should only be used for POST requests. Use GBRequestAsync for other request types.")
+	end
+
+	task.spawn(requestsMod.GBRequestAsync, requestType, ...)
+end
+
+--YEILDS 
+requestsMod.GBRequestAsync = function(requestType : string, args : {[string] : any}, maxRetries : number?) : any
 	local GBDomain, requestMethod = GetEndpointForRequest(requestType)
 	local response, body
 	args = args or {}
 
 	local partition = shared.GBMod("ABTesting").CUR_PARTITION
 
+	local authKey = YeildForKey()
+
 	-- Define relevant headers. Backend enforces header presence unless specified.
 	local headers = {
-		["authorization"] = projectKey,
+		["authorization"] = authKey,
 		["isstudio"] = tostring(runService:IsStudio()),
 		["sdkversion"] = "NA", --TODO: Get SDK version from attribute on SDK.
 		["universeid"] = tostring(game.GameId),
@@ -138,7 +164,7 @@ requestsMod.GBRequest = function(requestType : string, args : {[string] : any}, 
 
 	if response and #response.Body > 0 then
 		if response.StatusCode == 401 or response.StatusCode == 403 and not keyWarningGiven then
-			utilities.GBWarn("Gamebeast project key invalid or not set! Set your project key in the Keys module.")
+			utilities.GBWarn("Gamebeast project key invalid or not set! Set your project key in the :Setup method.")
 			keyWarningGiven = true
 		end
 
@@ -190,7 +216,7 @@ end
 -- Cleans up requests after processing. Can be request or result, just needs requestId field.
 requestsMod.sendRequestResults = function(results)
 	-- Sent once per batch
-	requestsMod.GBRequest("sdk/requests/completed", results)
+	requestsMod.GBRequestAsync("sdk/requests/completed", results)
 
 	for _, result in results do
 		local id = result.requestId
@@ -309,7 +335,7 @@ task.spawn(function()
 		if not shared.GBMod("HostServer"):IsHostServer() then return end
 
 		-- Get requests from Gamebeast. Soon-to-be legacy?
-		local newRequests, resp = requestsMod.GBRequest("sdk/requests")
+		local newRequests, resp = requestsMod.GBRequestAsync("sdk/requests")
 
 		if not newRequests or (resp["error"] or resp["StatusCode"] ~= 200) then
 			if tick() - lastReqWarning >= 10 and resp["StatusCode"] ~= 403 then
@@ -356,7 +382,7 @@ task.spawn(function()
 
 			-- Send job started message
 			if isHost then
-				requestsMod.GBRequest("sdk/requests/started", {request.requestId})
+				requestsMod.GBRequestAsync("sdk/requests/started", {request.requestId})
 			end
 
 			if (isHost or request.details.host_authority) and not request.details.hostOnly then

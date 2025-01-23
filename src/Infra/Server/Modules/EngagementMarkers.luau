@@ -74,6 +74,8 @@ function EngagementMarkers:SendMarkers()
 		MarkerQueue = {}
 		
 		local data = {
+			-- markers = {}
+			
 			["GBReserved"] = {
 				["Purchase"] = {},
 				["Chat"] = {},
@@ -95,7 +97,7 @@ function EngagementMarkers:SendMarkers()
 			end
 		end
 		
-		shared.GBMod("GBRequests").GBRequest("sdk/markers", data, 1)
+		shared.GBMod("GBRequests").GBRequestAsync("sdk/markers", data, 1)
 	end
 end
 

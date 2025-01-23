@@ -138,48 +138,9 @@ local function GetPublicModule(name : string) : PublicModuleData?
 	return FindModule(PublicModules, name)
 end
 
---= Object References =--
-
---= Constants =--
-
---= Variables =--
-
---= Public Variables =--
-
---= API Functions =--
-
-function Gamebeast:GetService(name : string) : Types.Service
-	if not Initialized then
-		local startTime = tick()
-		local didWarn = false
-		while not Initialized do
-			task.wait()
-			if tick() - startTime > 5 and not didWarn then
-				warn("Gamebeast SDK has not initialized, did you forget to call Gamebeast:Setup()?")
-				didWarn = true
-			end
-		end
-	end
-	
-	assert(Initialized, "Gamebeast SDK not initialized! Call Gamebeast:Setup() first.")
-
-	local module = GetPublicModule(name)
-	if module then
-		return require(module.Instance)
-	else
-		error("Gamebeast service \"".. name.. "\" not found!")
-	end
-end
-
-function Gamebeast:Setup(setupConfig : ServerSetupConfig?)
-	assert(not Initialized, "Gamebeast SDK already initialized!")
-	if IsServer == true then
-		assert(setupConfig, "Gamebeast SDK requires a setup config on the server.")
-		assert(setupConfig.key, "Gamebeast SDK requires a key to be set in the setup config.")
-	end
-	if IsServer == false then
-		setupConfig = setupConfig or {}
-		assert(setupConfig.key == nil, "Gamebeast SDK key should not be set on the client.")
+local function StartSDK()
+	if Initialized then
+		return
 	end
 
 	local targetModules = IsServer and script.Infra.Server or script.Infra.Client
@@ -189,17 +150,8 @@ function Gamebeast:Setup(setupConfig : ServerSetupConfig?)
 
 	-- Set settings
 
-	local sdkSettings = setupConfig.sdkSettings or {}
-
-	for key, value in DEFAULT_SETTINGS do
-		if sdkSettings[key] == nil then
-			sdkSettings[key] = value
-		end
-	end
-
 	local dataCacheModule = RequireModule(GetModule("DataCache"))
-	dataCacheModule:Set("Key", setupConfig.key)
-	dataCacheModule:Set("Settings", sdkSettings)
+	dataCacheModule:Set("Settings", table.clone(DEFAULT_SETTINGS))
 
 	-- Require all modules
 	for _, moduleData in (Modules) do
@@ -221,6 +173,52 @@ function Gamebeast:Setup(setupConfig : ServerSetupConfig?)
 	end
 
 	Initialized = true
+end
+
+--= Object References =--
+
+--= Constants =--
+
+--= Variables =--
+
+--= Public Variables =--
+
+--= API Functions =--
+
+function Gamebeast:GetService(name : string) : Types.Service
+	StartSDK()
+
+	local module = GetPublicModule(name)
+	if module then
+		return require(module.Instance)
+	else
+		error("Gamebeast service \"".. name.. "\" not found!")
+	end
+end
+
+function Gamebeast:Setup(setupConfig : ServerSetupConfig?)
+	if IsServer == true then
+		assert(setupConfig, "Gamebeast SDK requires a setup config on the server.")
+		assert(setupConfig.key, "Gamebeast SDK requires a key to be set in the setup config.")
+	end
+	if IsServer == false then
+		setupConfig = setupConfig or {}
+		assert(setupConfig.key == nil, "Gamebeast SDK key should not be set on the client.")
+	end
+
+	local sdkSettings = setupConfig.sdkSettings or {}
+
+	for key, value in DEFAULT_SETTINGS do
+		if sdkSettings[key] == nil then
+			sdkSettings[key] = value
+		end
+	end
+
+	StartSDK()
+
+	local dataCacheModule = RequireModule(GetModule("DataCache"))
+	dataCacheModule:Set("Key", setupConfig.key)
+	dataCacheModule:Set("Settings", sdkSettings)
 end
 
 

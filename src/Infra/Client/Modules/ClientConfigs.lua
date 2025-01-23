@@ -28,6 +28,7 @@ local GetConfigRemoteFunc = GetRemote("Function", "Get")
 --local GetEventDataRemoteFunc = GetRemote("Function", "GetEventData")
 local ConfigChangedRemote = GetRemote("Event", "ConfigChanged")
 local ConfigUpdatedSignal = Signal.new()
+local ConfigReadySignal = Signal.new()
 
 --= Constants =--
 
@@ -62,11 +63,19 @@ end
 
 --= API Functions =--
 
+function ClientConfigs:WaitForConfigsReady()
+	if not ConfigsReady then
+		ConfigReadySignal:Wait()
+	end
+end
+
 function ClientConfigs:Get(path : string | { string })
     if typeof(path) ~= "table" and typeof(path) ~= "string" then
 		error("Config path must be a string or list of strings.")
 		return nil
 	end
+
+    self:WaitForConfigsReady()
 
     if typeof(path) == "string" then
         path = {path}
@@ -98,6 +107,12 @@ function ClientConfigs:OnChanged(targetConfig : string | {string}, callback : (n
 	end)
 end
 
+function ClientConfigs:OnReady(callback : (configs : any) -> ()) : RBXScriptSignal
+    return ConfigReadySignal:Connect(function()
+        callback(CachedConfigs)
+    end)
+end
+    
 function ClientConfigs:IsReady() : boolean
     return ConfigsReady
 end
@@ -131,6 +146,7 @@ function ClientConfigs:Init()
         CachedConfigs = GetConfigRemoteFunc:InvokeServer()
         --TODO: Make sure we actually got something
         ConfigsReady = true
+        ConfigReadySignal:Fire()
     end)
     
 end
