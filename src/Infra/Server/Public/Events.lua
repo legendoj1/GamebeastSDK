@@ -17,7 +17,7 @@ local Events = { }
 --= Dependencies =--
 
 local EventsManager = shared.GBMod("EventsManager") ---@module EventsManager
-local Configs = shared.GBMod("Configs") ---@module Configs
+local InternalConfigs = shared.GBMod("InternalConfigs") ---@module InternalConfigs
 
 --= Types =--
 
@@ -34,7 +34,7 @@ local Configs = shared.GBMod("Configs") ---@module Configs
 --= API Functions =--
 
 function Events:GetEventData(eventName : string)
-    return Configs:GetEventData(eventName)
+    return InternalConfigs:GetEventData(eventName)
 end
 
 function Events:OnStart(eventName : string, callback : (eventInfo : { [string] : any }) -> ()) : RBXScriptSignal

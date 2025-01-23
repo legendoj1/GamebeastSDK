@@ -9,10 +9,6 @@ export type ServerSetupConfig = {
 	sdkSettings : SDKSettings?
 }
 
-export type ClientSetupConfig = {
-	sdkSettings : SDKSettings?
-}
-
 --NOTE: The actual JSON type doesnt get represented cleanly in Roblox's intellesense. This is a simplified version for now.
 export type JSON = any
 --[[{
@@ -23,16 +19,16 @@ export type JSON = any
 
 --// Public API Types
 
-export type ConfigService = {
-	Get : (self : ConfigService, path : string | { string }) -> any,
-	OnChanged : (self : ConfigService, targetConfig : string | {string}, callback : (newValue : any, oldValue : any) -> ()) -> RBXScriptConnection,
-	IsReady : (self : ConfigService) -> boolean,
+export type ConfigsService = {
+	Get : (self : ConfigsService, path : string | { string }) -> any,
+	OnChanged : (self : ConfigsService, targetConfig : string | {string}, callback : (newValue : any, oldValue : any) -> ()) -> RBXScriptConnection,
+	IsReady : (self : ConfigsService) -> boolean,
 }
 
 export type MarkersService = {
-	SendMarker : (self : MarkersService, marker : string, data : JSON) -> (),
+	SendMarker : (self : MarkersService, marker : string, data : JSON, position : Vector3?) -> (),
 	--Server only
-	SendPlayerMarker : (server : MarkersService, player : Player, marker : string, data : JSON) -> (),
+	SendPlayerMarker : (server : MarkersService, player : Player, marker : string, data : JSON, position : Vector3?) -> (),
 }
 
 export type EventsService = {
@@ -43,6 +39,6 @@ export type EventsService = {
 }
 
 
-export type Service = ConfigService | MarkersService | EventsService
+export type Service = ConfigsService | MarkersService | EventsService
 
 return true

@@ -322,15 +322,15 @@ task.spawn(function()
 		requestsMod.addRequestsToQueue(newRequests)
 	end
 
-	local Configs = shared.GBMod("Configs") -- RECURSIVE!
-	Configs:OnConfigsReady(function()
+	local InternalConfigs = shared.GBMod("InternalConfigs") -- RECURSIVE!
+	InternalConfigs:OnConfigsReady(function()
 		checkForRequests()
 
 		requestsMod.pendingJobsRan = true
 
 		while task.wait(UPDATE_PERIOD) do
 			checkForRequests()
-			UPDATE_PERIOD = Configs:GetActiveConfig("GBConfigs")["GBRates"]["CheckRequests"]
+			UPDATE_PERIOD = InternalConfigs:GetActiveConfig("GBConfigs")["GBRates"]["CheckRequests"]
 		end
 	end)
 

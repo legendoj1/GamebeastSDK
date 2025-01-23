@@ -20,7 +20,7 @@ local RunService = game:GetService("RunService")
 --= Dependencies =--
 
 local Utilities = shared.GBMod("Utilities")
-local Configs = shared.GBMod("Configs") ---@module Configs
+local InternalConfigs = shared.GBMod("InternalConfigs") ---@module InternalConfigs
 local Signal = shared.GBMod("Signal")
 
 --= Types =--
@@ -60,8 +60,8 @@ end
 
 -- Call update configs with cur configs to check/update partition without changing values
 local function checkPartitionDisribution()
-	local curConfigs = Configs:CopyConfigs()
-	curConfigs.GBConfigs = Configs:GetActiveConfig("GBConfigs") --NOTE: Are we just tacking GBConfigs onto the end of the configs table?
+	local curConfigs = InternalConfigs:CopyConfigs()
+	curConfigs.GBConfigs = InternalConfigs:GetActiveConfig("GBConfigs") --NOTE: Are we just tacking GBConfigs onto the end of the configs table?
 
 	-- See what set of configs we *should* be using, taking A/B testing campaigns into consideration
 	local _, partitionName = ABTesting:GetConfigProfileForServer(curConfigs)
@@ -181,7 +181,7 @@ function ABTesting:Init()
 	end
 
 	-- Tell other servers we exist and start partition self-rebalance loop
-	Configs:OnConfigsReady(function()
+	InternalConfigs:OnConfigsReady(function()
 		while task.wait(RandomObject:NextNumber(REBALANCE_CHECK_TIME.Min, REBALANCE_CHECK_TIME.Max)) do
 			checkPartitionDisribution()
 		end

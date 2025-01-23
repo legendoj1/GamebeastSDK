@@ -29,7 +29,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local GBRequests = shared.GBMod("GBRequests")
 local ABTesting = shared.GBMod("ABTesting")
 local Utilities = shared.GBMod("Utilities")
-local Configs = shared.GBMod("Configs") ---@module Configs
+local InternalConfigs = shared.GBMod("InternalConfigs") ---@module InternalConfigs
 local GetRemote = shared.GBMod("GetRemote")
 local Signal = shared.GBMod("Signal")
 
@@ -58,7 +58,7 @@ Updater.ConfigChanged = Signal.new()
 
 -- Update modules based on config data in new module version
 function Updater:UpdateConfigs(newConfigs, init)
-	local GBConfigs = Configs:GetActiveConfig("GBConfigs")
+	local GBConfigs = InternalConfigs:GetActiveConfig("GBConfigs")
 	local lastVersion = not init and GBConfigs["GBPublishTime"] or nil
 	
 	-- If we got an old configuration version over the wire for some reason, don't apply it
@@ -75,10 +75,10 @@ function Updater:UpdateConfigs(newConfigs, init)
 		end)
 	end
 
-	Configs:ApplyInternalConfigs(newConfigs["GBConfigs"])
+	InternalConfigs:ApplyInternalConfigs(newConfigs["GBConfigs"])
 
 	-- Update game configs
-	init = init or not Configs:IsReady()
+	init = init or not InternalConfigs:IsReady()
 
 	-- Determine whether we're using canonical config profile or A/B testing partition
 
@@ -101,7 +101,7 @@ function Updater:UpdateConfigs(newConfigs, init)
 
 	-- Integrate new configs
 
-	Configs:ApplyConfigs(configsToIntegrate, init)
+	InternalConfigs:ApplyConfigs(configsToIntegrate, init)
 
 
 

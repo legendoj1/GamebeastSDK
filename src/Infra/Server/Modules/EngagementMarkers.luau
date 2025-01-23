@@ -21,7 +21,7 @@ local PolicyService = game:GetService("PolicyService")
 
 --= Dependencies =--
 
-local Configs = shared.GBMod("Configs") ---@module Configs
+local InternalConfigs = shared.GBMod("InternalConfigs") ---@module InternalConfigs
 local GetRemote = shared.GBMod("GetRemote")
 local Utilities = shared.GBMod("Utilities")
 local PlayerStats = shared.GBMod("PlayerStats")
@@ -165,9 +165,9 @@ function EngagementMarkers:_createMarker(source : "server" | "client" | "sdk", m
 	end
 	
 	-- Yield only if first configs/initialization not done
-	if Configs:WaitForConfigsReady() then
+	if InternalConfigs:WaitForConfigsReady() then
 		-- To be overhauled likely with new heatmap API. Can likely scrap localization of marker position and send world positions
-		local heatmapMetadata = Configs:GetActiveConfig("GBConfigs").HeatmapMetadata
+		local heatmapMetadata = InternalConfigs:GetActiveConfig("GBConfigs").HeatmapMetadata
 
 		if position then
 			-- Warn if trying to send associated position and no heatmaps are defined
@@ -319,8 +319,8 @@ function EngagementMarkers:Init()
 				EngagementMarkers:SendMarkers()
 			end
 			
-			if Configs:WaitForConfigsReady() then
-				MAX_EVENT_REPORT_TIME = Configs:GetActiveConfig("GBConfigs")["GBRates"]["EngagementMarkers"]
+			if InternalConfigs:WaitForConfigsReady() then
+				MAX_EVENT_REPORT_TIME = InternalConfigs:GetActiveConfig("GBConfigs")["GBRates"]["EngagementMarkers"]
 			end
 		end
 	end)

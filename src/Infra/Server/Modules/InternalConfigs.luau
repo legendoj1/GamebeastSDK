@@ -2,7 +2,7 @@
 	The Gamebeast SDK is Copyright © 2023 Gamebeast, Inc. to present.
 	All rights reserved.
 	
-	Configs.luau
+	InternalConfigs.luau
 	
 	Description:
 		No description provided.
@@ -10,7 +10,7 @@
 --]]
 
 --= Root =--
-local Configs = { }
+local InternalConfigs = { }
 
 --= Roblox Services =--
 
@@ -62,11 +62,11 @@ end
 
 --= API Functions =--
 
-function Configs:IsReady() : boolean
+function InternalConfigs:IsReady() : boolean
 	return ConfigsReady
 end
 
-function Configs:OnConfigsReady(callback : () -> ())
+function InternalConfigs:OnConfigsReady(callback : () -> ())
 	if not ConfigsReady then
 		ConfigReadySignal:Once(callback)
 	else
@@ -74,15 +74,15 @@ function Configs:OnConfigsReady(callback : () -> ())
 	end
 end
 
----@deprecated Use Configs:OnConfigsReady instead.
-function Configs:WaitForConfigsReady() : true
+---@deprecated Use InternalConfigs:OnConfigsReady instead.
+function InternalConfigs:WaitForConfigsReady() : true
 	if not ConfigsReady then
 		ConfigReadySignal:Wait()
 	end
 	return true
 end
 
-function Configs:OnChanged(targetConfig : string | {string}, callback : (newValue : any, oldValue : any) -> ()) : RBXScriptConnection
+function InternalConfigs:OnChanged(targetConfig : string | {string}, callback : (newValue : any, oldValue : any) -> ()) : RBXScriptConnection
 
 	-- Establish bindable connection
 	return ConfigUpdatedSignal:Connect(function(changedPath, newValue, oldValue)
@@ -99,12 +99,12 @@ function Configs:OnChanged(targetConfig : string | {string}, callback : (newValu
 	end)
 end
 
-function Configs:_checkConfigChanged(configs, path, value) : boolean
+function InternalConfigs:_checkConfigChanged(configs, path, value) : boolean
 	configs = configs or ActiveConfigs.DevConfigs
 
 	local oldValue = self:Get(path, configs)
 	-- Config table reference is overwritten, don't actually need to set values -- save iteration.
-	--local location, lastKey = shared.GBMod("Configs").getEndpointFromPath(config, configs)
+	--local location, lastKey = shared.GBMod("InternalConfigs").getEndpointFromPath(config, configs)
 	--location[lastKey] = value
 
 
@@ -128,7 +128,7 @@ function Configs:_checkConfigChanged(configs, path, value) : boolean
 	return hasChanged
 end
 
-function Configs:ApplyInternalConfigs(newGBConfigs)
+function InternalConfigs:ApplyInternalConfigs(newGBConfigs)
 	-- Split internally used metadata from dev facing configs
 	for index, value in newGBConfigs do
 		ActiveConfigs.GBConfigs[index] = value
@@ -138,7 +138,7 @@ function Configs:ApplyInternalConfigs(newGBConfigs)
 	--EventDataUpdatedRemote:FireAllClients(newConfigs["GBEventData"])
 end
 
-function Configs:ApplyConfigs(newConfigs, init : boolean?)
+function InternalConfigs:ApplyConfigs(newConfigs, init : boolean?)
 	local updatedBranches = {}
 	local oldConfigs = ActiveConfigs.DevConfigs
 	
@@ -214,7 +214,7 @@ function Configs:ApplyConfigs(newConfigs, init : boolean?)
 	-- Freeze highest level table not referenced in traversal
 	table.freeze(newConfigs)
 	
-	--shared.GBMod("Configs").clientConfigs = newClientConfigs
+	--shared.GBMod("InternalConfigs").clientConfigs = newClientConfigs
 	---- Freeze highest level table not referenced in traversal
 	--table.freeze(clientConfigs)
 	
@@ -226,12 +226,12 @@ function Configs:ApplyConfigs(newConfigs, init : boolean?)
 end
 
 -- Returns a copy of the active dev configs
-function Configs:CopyConfigs()
+function InternalConfigs:CopyConfigs()
 	return Utilities.recursiveCopy(ActiveConfigs.DevConfigs)
 end
 
 -- Get the value of a specific config
-function Configs:Get(path : string | { string }, configs : any) : any
+function InternalConfigs:Get(path : string | { string }, configs : any) : any
 	if typeof(path) ~= "table" and typeof(path) ~= "string" then
 		Utilities.GBWarn("Config path must be a string or list of strings.")
 		return nil
@@ -246,12 +246,12 @@ function Configs:Get(path : string | { string }, configs : any) : any
 	return location[lastKey]
 end
 
-function Configs:GetActiveConfig(key : string) : any
+function InternalConfigs:GetActiveConfig(key : string) : any
 	return ActiveConfigs[key]
 end
 
 -- Get the value of a specific event
-function Configs:GetEventData(eventName : string) : { [string] : any }
+function InternalConfigs:GetEventData(eventName : string) : { [string] : any }
 	local info = ActiveConfigs.GBConfigs.GBEventData[eventName]
 	
 	if not info then
@@ -261,7 +261,7 @@ function Configs:GetEventData(eventName : string) : { [string] : any }
 	return info
 end
 
-function Configs:GetEndpointFromPath(path, configs)
+function InternalConfigs:GetEndpointFromPath(path, configs)
 	if not (typeof(path) == "table") then
 		return configs or ActiveConfigs.DevConfigs, path
 	elseif #path == 1 then
@@ -282,7 +282,7 @@ function Configs:GetEndpointFromPath(path, configs)
 end
 
 --= Initializers =--
-function Configs:Init()
+function InternalConfigs:Init()
 
 	-- Call Get for clients and return value.
 	GetConfigRemoteFunc.OnServerInvoke = function(_, path)
@@ -305,4 +305,4 @@ function Configs:Init()
 end
 
 --= Return Module =--
-return Configs
+return InternalConfigs

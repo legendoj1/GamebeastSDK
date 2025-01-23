@@ -23,11 +23,10 @@ local Types = require(script.Types)
 --= Types =--
 
 export type ServerSetupConfig = Types.ServerSetupConfig
-export type ClientSetupConfig = Types.ClientSetupConfig
 export type JSON = Types.JSON
 
 -- Services
-export type ConfigService = Types.ConfigService
+export type ConfigsService = Types.ConfigsService
 export type MarkersService = Types.MarkersService
 export type EventsService = Types.EventsService
 
@@ -150,6 +149,18 @@ end
 --= API Functions =--
 
 function Gamebeast:GetService(name : string) : Types.Service
+	if not Initialized then
+		local startTime = tick()
+		local didWarn = false
+		while not Initialized do
+			task.wait()
+			if tick() - startTime > 5 and not didWarn then
+				warn("Gamebeast SDK has not initialized, did you forget to call Gamebeast:Setup()?")
+				didWarn = true
+			end
+		end
+	end
+	
 	assert(Initialized, "Gamebeast SDK not initialized! Call Gamebeast:Setup() first.")
 
 	local module = GetPublicModule(name)
@@ -160,12 +171,14 @@ function Gamebeast:GetService(name : string) : Types.Service
 	end
 end
 
-function Gamebeast:Setup(setupConfig : ServerSetupConfig | ClientSetupConfig)
+function Gamebeast:Setup(setupConfig : ServerSetupConfig?)
 	assert(not Initialized, "Gamebeast SDK already initialized!")
 	if IsServer == true then
+		assert(setupConfig, "Gamebeast SDK requires a setup config on the server.")
 		assert(setupConfig.key, "Gamebeast SDK requires a key to be set in the setup config.")
 	end
 	if IsServer == false then
+		setupConfig = setupConfig or {}
 		assert(setupConfig.key == nil, "Gamebeast SDK key should not be set on the client.")
 	end
 

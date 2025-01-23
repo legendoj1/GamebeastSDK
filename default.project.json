@@ -8,6 +8,30 @@
       "Gamebeast": {
         "$path": "src"
       }
+    },
+
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "StartTest": {
+          "$path": "tests/StartTest.client.luau"
+        }
+      }
+    },
+
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "StartTest": {
+        "$path": "tests/StartTest.server.luau"
+      }
+    },
+
+    "ReplicatedFirst": {
+      "$className": "ReplicatedFirst",
+      "Tests": {
+        "$path": "tests"
+      }
     }
   }
 }

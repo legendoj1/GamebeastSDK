@@ -17,7 +17,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 --= Dependencies =--
 
-local Configs = shared.GBMod("Configs") ---@module Configs
+local InternalConfigs = shared.GBMod("InternalConfigs") ---@module InternalConfigs
 local Utilities = shared.GBMod("Utilities")
 local Signal = shared.GBMod("Signal")
 
@@ -73,12 +73,12 @@ end
 
 --= Initializers =--
 function EventsManager:Init()
-	Configs:OnConfigsReady(function()
+	InternalConfigs:OnConfigsReady(function()
 
 		-- Loop to check if an event should be executed
 		task.spawn(function()
 			while task.wait(EVENT_CHECK_PERIOD) do
-				for eventName, eventData in Configs:GetActiveConfig("GBConfigs")["EventData"] do
+				for eventName, eventData in InternalConfigs:GetActiveConfig("GBConfigs")["EventData"] do
 					if not EventStatusCache[eventName] then
 						EventStatusCache[eventName] = {
 							Started = false

@@ -114,6 +114,13 @@ function ClientConfigs:Init()
                 target[pathSegment] = newValue
             else
                 target = target[pathSegment]
+
+                -- Temp
+                if target == nil then
+                    CachedConfigs = GetConfigRemoteFunc:InvokeServer()
+                    break
+                end
+                --TODO: This is a problem if the path is invalid and the config changes completely.
             end
         end
 

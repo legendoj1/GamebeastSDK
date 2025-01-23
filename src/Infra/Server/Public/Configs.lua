@@ -2,7 +2,7 @@
     The Gamebeast SDK is Copyright © 2023 Gamebeast, Inc. to present.
     All rights reserved.
     
-    Config.lua
+    Configs.lua
     
     Description:
         No description provided.
@@ -10,14 +10,14 @@
 --]]
 
 --= Root =--
-local Config = { }
+local Configs = { }
 
 --= Roblox Services =--
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 --= Dependencies =--
 
-local InternalConfigs = shared.GBMod("Configs")
+local InternalConfigs = shared.GBMod("InternalConfigs")
 
 --= Types =--
 
@@ -33,17 +33,17 @@ local InternalConfigs = shared.GBMod("Configs")
 
 --= API Functions =--
 
-function Config:Get(path : string | { string })
+function Configs:Get(path : string | { string })
     return InternalConfigs:Get(path)
 end
 
-function Config:OnChanged(targetConfig : string | {string}, callback : (newValue : any, oldValue : any) -> ()) : RBXScriptConnection
+function Configs:OnChanged(targetConfig : string | {string}, callback : (newValue : any, oldValue : any) -> ()) : RBXScriptConnection
     return InternalConfigs:OnChanged(targetConfig, callback)
 end
 
-function Config:IsReady() : boolean
+function Configs:IsReady() : boolean
     return InternalConfigs:IsReady()
 end
 
 --= Return Module =--
-return Config
+return Configs

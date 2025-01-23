@@ -22,7 +22,7 @@ local LocalizationService = game:GetService("LocalizationService")
 --= Dependencies =--
 
 local Utilities = shared.GBMod("Utilities")
-local Configs = shared.GBMod("Configs")
+local InternalConfigs = shared.GBMod("InternalConfigs")
 local EngagementMarkers = shared.GBMod("EngagementMarkers") ---@module Markers
 
 --= Types =--
@@ -57,7 +57,7 @@ function SentimentCapture:Init()
 				Chat:FilterStringForBroadcast(message, player)
 			end) or message
 	
-			local heatmapMetadata = Configs.GBConfigs.HeatmapMetadata
+			local heatmapMetadata = InternalConfigs.GBConfigs.HeatmapMetadata
 	
 			--NOTE: Likely to scrap position localization with new heatmap API
 			if heatmapMetadata.center then
