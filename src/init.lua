@@ -55,7 +55,7 @@ local DEFAULT_SETTINGS = {
 
 local Modules = {} :: { [string] : ModuleData }
 local PublicModules = {} :: { [string] : ModuleData }
-local Initialized = false
+local Initializing = false
 local DidRequire = false
 local IsServer = RunService:IsServer()
 
@@ -139,9 +139,11 @@ local function GetPublicModule(name : string) : PublicModuleData?
 end
 
 local function StartSDK()
-	if Initialized then
+	if Initializing then
 		return
 	end
+
+	Initializing = true
 
 	local targetModules = IsServer and script.Infra.Server or script.Infra.Client
 
@@ -171,8 +173,6 @@ local function StartSDK()
 			task.spawn(InitMethod, moduleData.Module)
 		end
 	end
-
-	Initialized = true
 end
 
 --= Object References =--

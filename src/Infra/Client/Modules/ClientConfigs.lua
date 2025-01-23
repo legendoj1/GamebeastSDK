@@ -146,7 +146,7 @@ function ClientConfigs:Init()
         CachedConfigs = GetConfigRemoteFunc:InvokeServer()
         --TODO: Make sure we actually got something
         ConfigsReady = true
-        ConfigReadySignal:Fire()
+        ConfigReadySignal:Fire(CachedConfigs)
     end)
     
 end

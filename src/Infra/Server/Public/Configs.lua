@@ -17,7 +17,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 --= Dependencies =--
 
-local InternalConfigs = shared.GBMod("InternalConfigs")
+local InternalConfigs = shared.GBMod("InternalConfigs") ---@module InternalConfigs
 
 --= Types =--
 
@@ -39,6 +39,10 @@ end
 
 function Configs:OnChanged(targetConfig : string | {string}, callback : (newValue : any, oldValue : any) -> ()) : RBXScriptConnection
     return InternalConfigs:OnChanged(targetConfig, callback)
+end
+
+function Configs:OnReady(callback : (configs : any) -> ()) : RBXScriptSignal
+    return InternalConfigs:OnReady(callback)
 end
 
 function Configs:IsReady() : boolean

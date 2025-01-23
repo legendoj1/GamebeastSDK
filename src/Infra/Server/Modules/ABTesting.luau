@@ -181,7 +181,7 @@ function ABTesting:Init()
 	end
 
 	-- Tell other servers we exist and start partition self-rebalance loop
-	InternalConfigs:OnConfigsReady(function()
+	InternalConfigs:OnReady(function()
 		while task.wait(RandomObject:NextNumber(REBALANCE_CHECK_TIME.Min, REBALANCE_CHECK_TIME.Max)) do
 			checkPartitionDisribution()
 		end

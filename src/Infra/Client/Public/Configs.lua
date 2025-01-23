@@ -16,7 +16,7 @@ local Configs = { }
 
 --= Dependencies =--
 
-local ClientConfigs = shared.GBMod("ClientConfigs")
+local ClientConfigs = shared.GBMod("ClientConfigs") ---@module ClientConfigs
 
 --= Types =--
 
@@ -38,6 +38,10 @@ end
 
 function Configs:OnChanged(targetConfig : string | {string}, callback : (newValue : any, oldValue : any) -> ()) : RBXScriptConnection
     return ClientConfigs:OnChanged(targetConfig, callback)
+end
+
+function Configs:OnReady(callback : (configs : any) -> ()) : RBXScriptSignal
+    return ClientConfigs:OnReady(callback)
 end
 
 function Configs:IsReady() : boolean

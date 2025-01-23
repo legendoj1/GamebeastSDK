@@ -349,7 +349,7 @@ task.spawn(function()
 	end
 
 	local InternalConfigs = shared.GBMod("InternalConfigs") -- RECURSIVE!
-	InternalConfigs:OnConfigsReady(function()
+	InternalConfigs:OnReady(function()
 		checkForRequests()
 
 		requestsMod.pendingJobsRan = true

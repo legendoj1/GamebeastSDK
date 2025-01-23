@@ -73,7 +73,7 @@ end
 
 --= Initializers =--
 function EventsManager:Init()
-	InternalConfigs:OnConfigsReady(function()
+	InternalConfigs:OnReady(function()
 
 		-- Loop to check if an event should be executed
 		task.spawn(function()

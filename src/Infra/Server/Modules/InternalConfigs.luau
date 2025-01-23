@@ -66,7 +66,7 @@ function InternalConfigs:IsReady() : boolean
 	return ConfigsReady
 end
 
-function InternalConfigs:OnConfigsReady(callback : () -> ())
+function InternalConfigs:OnReady(callback : (newConfigs : any) -> ())
 	if not ConfigsReady then
 		ConfigReadySignal:Once(callback)
 	else
@@ -220,7 +220,7 @@ function InternalConfigs:ApplyConfigs(newConfigs, init : boolean?)
 	--TODO:
 	ConfigsReady = true
 
-	ConfigReadySignal:Fire()
+	ConfigReadySignal:Fire(newConfigs)
 	--ConfigUpdatedSignal:Fire(path, newValue, oldValue)
 end
 
