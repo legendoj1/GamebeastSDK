@@ -22,17 +22,16 @@ export type JSON = any
 export type ConfigsService = {
 	Get : (self : ConfigsService, path : string | { string }) -> any,
 	OnChanged : (self : ConfigsService, targetConfig : string | {string}, callback : (newValue : any, oldValue : any) -> ()) -> RBXScriptConnection,
+	OnReady : (self : ConfigsService, callback : (configs : any) -> ()) -> RBXScriptSignal,
 	IsReady : (self : ConfigsService) -> boolean,
 }
 
 export type MarkersService = {
 	SendMarker : (self : MarkersService, marker : string, data : JSON, position : Vector3?) -> (),
-	--Server only
 	SendPlayerMarker : (server : MarkersService, player : Player, marker : string, data : JSON, position : Vector3?) -> (),
 }
 
 export type EventsService = {
-	-- Server only
 	GetEventData : (self : EventsService, event : string) -> JSON,
 	OnStart : (self : EventsService, event : string, callback : (data : JSON) -> ()) -> RBXScriptConnection,
 	OnEnd : (self : EventsService, event : string, callback : (data : JSON) -> ()) -> RBXScriptConnection,

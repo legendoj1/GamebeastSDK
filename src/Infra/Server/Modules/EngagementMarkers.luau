@@ -87,7 +87,7 @@ function EngagementMarkers:SendMarkers()
 
 		MarkerQueue = {}
 		
-		shared.GBMod("GBRequests").GBRequestAsync("sdk/markers", data, 1)
+		shared.GBMod("GBRequests"):GBRequestAsync("sdk/markers", data, 1)
 	end
 end
 

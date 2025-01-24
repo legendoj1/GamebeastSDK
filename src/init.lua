@@ -157,7 +157,12 @@ local function StartSDK()
 
 	-- Require all modules
 	for _, moduleData in (Modules) do
+		--local startTime = tick()
 		RequireModule(moduleData)
+
+		--[[if tick() - startTime > 0.1 then
+			warn("Required module", moduleData.Name, "in", tick() - startTime)
+		end]]
 	end
 	DidRequire = true
 
