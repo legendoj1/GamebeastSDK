@@ -139,7 +139,7 @@ end
 --= Initializers =--
 function Updater:Init()
 	-- Start up, ask for most recent configuations
-	local newConfigsResp, req = GBRequests.GBRequestAsync("sdk/configurations", nil, 1)
+	local newConfigsResp, req = GBRequests:GBRequestAsync("sdk/configurations", nil, 1)
 	local newConfigs
 
 	-- If no response or failed status, attempt to recover
@@ -153,7 +153,7 @@ function Updater:Init()
 			repeat
 				task.wait(10)
 				Utilities.GBWarn("Attempting to establish connection...")
-				newConfigs = GBRequests.GBRequestAsync("sdk/configurations", nil, 0)
+				newConfigs = GBRequests:GBRequestAsync("sdk/configurations", nil, 0)
 			until newConfigs
 			print("Connection with Gamebeast re-established! Loading newest configs...")
 		else

@@ -40,7 +40,7 @@ requestFunctions.funcs = {
 			
 			-- If the service failed, we can't proceed
 			if not success then
-				shared.GBMod("GBRequests").sendFailure(request)
+				shared.GBMod("GBRequests"):SendFailure(request)
 				return
 			end
 		else
@@ -57,9 +57,9 @@ requestFunctions.funcs = {
 		end)
 		
 		if not success then
-			shared.GBMod("GBRequests").sendFailure(request)
+			shared.GBMod("GBRequests"):SendFailure(request)
 		else
-			shared.GBMod("GBRequests").sendSuccess(request)
+			shared.GBMod("GBRequests"):SendSuccess(request)
 		end
 	end;
 	
@@ -79,7 +79,7 @@ requestFunctions.funcs = {
 
 			-- If the service failed, we can't proceed
 			if not success then
-				shared.GBMod("GBRequests").sendFailure(request)
+				shared.GBMod("GBRequests"):SendFailure(request)
 				return
 			end
 		else
@@ -93,9 +93,9 @@ requestFunctions.funcs = {
 		end)
 
 		if not success then
-			shared.GBMod("GBRequests").sendFailure(request)
+			shared.GBMod("GBRequests"):SendFailure(request)
 		else
-			shared.GBMod("GBRequests").sendSuccess(request)
+			shared.GBMod("GBRequests"):SendSuccess(request)
 		end
 	end;
 	
@@ -129,7 +129,7 @@ requestFunctions.funcs = {
 		end
 		
 		if shared.GBMod("HostServer"):IsHostServer() then
-			shared.GBMod("GBRequests").sendSuccess(request)
+			shared.GBMod("GBRequests"):SendSuccess(request)
 		end
 	end;
 	
@@ -139,7 +139,7 @@ requestFunctions.funcs = {
 		shared.GBMod("Updater"):UpdateConfigs(request.args)
 		
 		if shared.GBMod("HostServer"):IsHostServer() then
-			shared.GBMod("GBRequests").sendSuccess(request, {})
+			shared.GBMod("GBRequests"):SendSuccess(request, {})
 		end
 	end;
 	
@@ -150,9 +150,9 @@ requestFunctions.funcs = {
 	--	end)
 		
 	--	if success then
-	--		shared.GBMod("GBRequests").sendFailure(request)
+	--		shared.GBMod("GBRequests"):SendFailure(request)
 	--	else
-	--		shared.GBMod("GBRequests").sendSuccess(request, {res})
+	--		shared.GBMod("GBRequests"):SendSuccess(request, {res})
 	--	end
 	--end;
 }
