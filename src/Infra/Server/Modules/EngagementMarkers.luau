@@ -24,8 +24,9 @@ local PolicyService = game:GetService("PolicyService")
 local InternalConfigs = shared.GBMod("InternalConfigs") ---@module InternalConfigs
 local GetRemote = shared.GBMod("GetRemote")
 local Utilities = shared.GBMod("Utilities")
-local PlayerStats = shared.GBMod("PlayerStats")
-local ServerClientInfoHandler = shared.GBMod("ServerClientInfoHandler")
+local PlayerStats = shared.GBMod("PlayerStats") ---@module PlayerStats
+local LocalizationCache = shared.GBMod("LocalizationCache") ---@module LocalizationCache
+local ServerClientInfoHandler = shared.GBMod("ServerClientInfoHandler") ---@module ServerClientInfoHandler
 
 --= Types =--
 
@@ -63,6 +64,16 @@ local LastEventReportTime = 0
 
 --= Internal Functions =--
 
+local function EncodeVector3(vec)
+	local vectorArray = {vec.X, vec.Y, vec.Z}
+
+	for i = 1, 3 do
+		vectorArray[i] = Utilities.roundNum(vectorArray[i], 0.0001)
+	end
+
+	return vectorArray
+end
+
 --= API Functions =--
 
 -- Send batch to GB
@@ -70,32 +81,11 @@ function EngagementMarkers:SendMarkers()
 	if #MarkerQueue > 0 then
 		LastEventReportTime = tick()
 		
-		local entries = MarkerQueue
-		MarkerQueue = {}
-		
 		local data = {
-			-- markers = {}
-			
-			["GBReserved"] = {
-				["Purchase"] = {},
-				["Chat"] = {},
-				["Login"] = {},
-				["Logout"] = {}
-			},
-			["general"] = {
-				["markers"] = {}
-			}
+			markers = MarkerQueue
 		}
 
-		for _, marker in entries do
-			local markerType = marker["type"]
-			
-			if data["GBReserved"][markerType] then
-				table.insert(data["GBReserved"][markerType], marker)
-			else
-				table.insert(data["general"].markers, marker)
-			end
-		end
+		MarkerQueue = {}
 		
 		shared.GBMod("GBRequests").GBRequestAsync("sdk/markers", data, 1)
 	end
@@ -103,7 +93,7 @@ end
 
 -- Core function, should be used internally by SDK rather than fireMarker
 -- function EngagementMarkers:CreateMarker(source, markerType, player, position, value)
-function EngagementMarkers:_createMarker(source : "server" | "client" | "sdk", markerType : string, value : any | {[string] : any}, metaData : {[string] : any})
+function EngagementMarkers:_createMarker(source : "server" | "client" | "sdk", markerType : string, value : number | {[string] : any}, metaData : {[string] : any})
 	metaData = metaData or {}
 	-- Validate all arguments.
 	local usageStr
@@ -149,48 +139,24 @@ function EngagementMarkers:_createMarker(source : "server" | "client" | "sdk", m
 	
 	-- Marker fields
 	local entry = {
+		["timestamp"] = DateTime.now().UnixTimestampMillis,
 		["type"] = markerType,
-		["user_id"] = userId,
-		["utc"] = DateTime.now().UnixTimestampMillis,
-		["args"] = if typeof(value) == "table" then value else nil,
-		["origin"] = source,
-		["value"] = if typeof(value) == "number" then value else nil,
+		["userId"] = userId,
+		["sessionId"] = userId and SessionIds[userId] or nil,
+		["value"] = value,
+		["properties"] = {
+			["origin"] = source,
+			["device"] = ServerClientInfoHandler:GetClientInfo(player, "device"),
+			["position"] = position ~= nil and EncodeVector3(position) or nil,
+			["localeId"] = player and LocalizationCache:GetLocaleId(player) or nil,
+			["regionId"] = player and LocalizationCache:GetRegionId(player) or nil,
+			["sdkVersion"] = "unknown",
+			-- server A/B testing partition ID if applicable
+			--["partition_id"] = partition ~= "" and partition or nil,
+		},
 		-- server A/B testing partition ID if applicable
 		--["partition_id"] = partition ~= "" and partition or nil,
 	}
-	
-	-- If player associated marker, include unique session ID
-	if userId then
-		entry["session_id"] = SessionIds[userId]
-		-- client A/B testing partition ID if applicable
-		--["partition_id"] = activeCampaign and id or nil
-	end
-	
-	-- Yield only if first configs/initialization not done
-	if InternalConfigs:WaitForConfigsReady() then
-		-- To be overhauled likely with new heatmap API. Can likely scrap localization of marker position and send world positions
-		local heatmapMetadata = InternalConfigs:GetActiveConfig("GBConfigs").HeatmapMetadata
-
-		if position then
-			-- Warn if trying to send associated position and no heatmaps are defined
-			-- Round positions to avoid sending 14 decimals of accuracy across wire
-			
-			if not heatmapMetadata.center and not SYSTEM_MARKERS[markerType] then
-				--utilities.GBWarn("A heatmap must be defined for position information to be included with markers.")
-			elseif heatmapMetadata.center then
-				-- Localize position
-				local center, size = heatmapMetadata.center, heatmapMetadata.size
-				center = CFrame.new(center[1], center[2], center[3])
-				size = Vector3.new(size[1], size[2], size[3])
-				position = center:Inverse() * CFrame.new(position)
-				local x = Utilities.roundNum(-position.X / size.X, 0.0001)
-				local y = Utilities.roundNum(position.Y / size.Y, 0.0001)
-				local z = Utilities.roundNum(-position.Z / size.Z, 0.0001)
-				
-				entry.position = {x, y, z}
-			end
-		end
-	end
 	
 	table.insert(MarkerQueue, entry)
 	
@@ -266,17 +232,9 @@ function EngagementMarkers:Init()
 		
 		-- Send Login marker with relevant session information
 		local loginArgs = {
-			region_id = Utilities.promiseReturn(1, function()
-				return LocalizationService:GetCountryRegionForPlayerAsync(player)
-			end) or "unknown",
-			locale_id = Utilities.promiseReturn(1, function()
-				return LocalizationService:GetTranslatorForPlayer(player).LocaleId
-			end) or "unknown",
-			allowed_ads = Utilities.promiseReturn(1, function()
+			adsAllowed = Utilities.promiseReturn(1, function()
 				return PolicyService:GetPolicyInfoForPlayerAsync(player).AreAdsAllowed
 			end),
-			--TODO: Add device type to markers.
-			device = ServerClientInfoHandler:GetClientInfo(player, "deviceType") or "unknown",
 		}
 		
 		self:SDKMarker("Login", loginArgs, {player = player, position = position})
@@ -299,7 +257,7 @@ function EngagementMarkers:Init()
 		
 		-- Compute session length in addition to backend for reasons(?)
 		local args = {
-			["session_length"] = Utilities.roundNum(tick() - PlayerStats:GetStat(player, "session_length"), 0.1)
+			["sessionLength"] = Utilities.roundNum(tick() - PlayerStats:GetStat(player, "session_length"), 0.1)
 		}
 		
 		-- Send Logout marker with relevant info

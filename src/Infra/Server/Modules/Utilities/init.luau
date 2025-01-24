@@ -21,6 +21,14 @@ utilities.GBWarn = function(message)
 	end
 end
 
+utilities.resolvePlayerObject = function(playerQuery : Player | number)
+	if typeof(playerQuery) == "number" then
+		return game.Players:GetPlayerByUserId(playerQuery)
+	else
+		return playerQuery
+	end
+end
+
 -- pcall wrapper function with retry support used extensively in SDK.
 utilities.promiseReturn = function(maxRetries, callback, retries)
 	if maxRetries and not retries then
