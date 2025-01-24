@@ -51,7 +51,7 @@ end
 --= Initializers =--
 function ClientInfoHandler:Init()
     ClientInfoRemote:FireServer(nil, {
-        deviceType = self:GetDeviceType()
+        device = self:GetDeviceType()
     })
 end
 

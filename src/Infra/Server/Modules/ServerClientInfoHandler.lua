@@ -28,6 +28,10 @@ local ClientInfoRemote = GetRemote("Event", "ClientInfoChanged")
 
 --= Constants =--
 
+local DEFAULT_INFO = {
+    device = "unknown",
+}
+
 --= Variables =--
 
 local ClientInfoCache = {}
@@ -38,12 +42,16 @@ local ClientInfoCache = {}
 
 --= API Functions =--
 
-function ServerClientInfoHandler:GetClientInfo(player : Player, key : string) : any?
-    if ClientInfoCache[player] then
-        return ClientInfoCache[player][key]
+function ServerClientInfoHandler:GetClientInfo(player : Player | number, key : string) : any
+    if typeof(player) == "number" then
+        player = Players:GetPlayerByUserId(player)
     end
 
-    return nil
+    if not player or not ClientInfoCache[player] or not ClientInfoCache[player][key] then
+        return DEFAULT_INFO[key]
+    end
+    
+    return ClientInfoCache[player][key]
 end
 
 --= Initializers =--
@@ -53,6 +61,10 @@ function ServerClientInfoHandler:Init()
     end)
 
     ClientInfoRemote.OnServerEvent:Connect(function(player : Player, key : string | nil, value : any)
+        if not DEFAULT_INFO[key] then
+            return
+        end
+
         if not ClientInfoCache[player] then
             ClientInfoCache[player] = {}
         end
