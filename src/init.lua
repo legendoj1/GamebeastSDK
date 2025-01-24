@@ -18,7 +18,7 @@ local RunService = game:GetService("RunService")
 
 --= Dependencies =--
 
-local Types = require(script.Types)
+local Types = require(script.Infra.Types)
 
 --= Types =--
 

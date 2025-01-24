@@ -24,6 +24,7 @@ local RequestFunctions = require(script.RequestFunctions)
 local Utilities = shared.GBMod("Utilities")
 local Queue = shared.GBMod("Queue")
 local DataCache = shared.GBMod("DataCache")
+local Signal = shared.GBMod("Signal") ---@module Signal
 
 --= Types =--
 
@@ -58,6 +59,9 @@ local ENDPOINTS = {
 }
 
 --= Object References =--
+
+local FinalRequestSignal = Signal.new()
+local RequestProcessingCount = 0
 
 -- For processing requests in the order received
 local RequestQueue = Queue.new()
@@ -129,6 +133,17 @@ end
 
 --= API Functions =--
 
+-- Callback that is fired when the game is shutting down for final request processing.
+function GBRequests:OnFinalRequestCall(callback : () -> ())
+	return FinalRequestSignal:Connect(function()
+		local currentThread = coroutine.running()
+		callback()
+		if currentThread ~= coroutine.running() then
+			error("Final request should not yeild!")
+		end
+	end)
+end
+
 -- Main method for dispatching requests from SDK to backend
 -- Returns parsed body and original response if body can be resolve and response only otherwise
 function GBRequests:GBRequest(requestType : string, args : {[string] : any}) : nil
@@ -144,6 +159,7 @@ end
 
 --YEILDS 
 function GBRequests:GBRequestAsync(requestType : string, args : {[string] : any}, maxRetries : number?) : any
+	RequestProcessingCount += 1
 	local GBDomain, requestMethod = GetEndpointForRequest(requestType)
 	local response, body
 	args = args or {}
@@ -194,6 +210,9 @@ function GBRequests:GBRequestAsync(requestType : string, args : {[string] : any}
 			Body = body
 		})
 	end)
+
+
+	RequestProcessingCount -= 1
 
 	if response and #response.Body > 0 then
 		if response.StatusCode == 401 or response.StatusCode == 403 and not keyWarningGiven then
@@ -486,6 +505,14 @@ function GBRequests:Init()
 				self:SendRequestResults(queuedResults)
 			end
 		end
+	end)
+
+	game:BindToClose(function()
+		FinalRequestSignal:Fire()
+
+		repeat
+			task.wait()
+		until RequestProcessingCount == 0
 	end)
 end
 

@@ -27,6 +27,8 @@ local Utilities = shared.GBMod("Utilities")
 local PlayerStats = shared.GBMod("PlayerStats") ---@module PlayerStats
 local LocalizationCache = shared.GBMod("LocalizationCache") ---@module LocalizationCache
 local ServerClientInfoHandler = shared.GBMod("ServerClientInfoHandler") ---@module ServerClientInfoHandler
+local GBRequests = shared.GBMod("GBRequests") ---@module GBRequests
+
 
 --= Types =--
 
@@ -86,8 +88,7 @@ function EngagementMarkers:SendMarkers()
 		}
 
 		MarkerQueue = {}
-		
-		shared.GBMod("GBRequests"):GBRequestAsync("sdk/markers", data, 1)
+		GBRequests:GBRequest("sdk/markers", data)
 	end
 end
 
@@ -285,15 +286,9 @@ function EngagementMarkers:Init()
 		end
 	end)
 
-	-- Can be annoying to wait for markers to send when you're stopping a test in studio. Maybe make a setting?
-	if not RunService:IsStudio() then
-		game:BindToClose(function()
-			-- Wait for markers from various systems to come in
-			task.wait(0.5)
-			-- Send remaining items in queue on shutdown
-			EngagementMarkers:SendMarkers()
-		end)
-	end
+	GBRequests:OnFinalRequestCall(function()
+		EngagementMarkers:SendMarkers()
+	end)
 end
 
 --= Return Module =--
