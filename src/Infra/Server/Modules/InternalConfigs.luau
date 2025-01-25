@@ -98,10 +98,10 @@ function InternalConfigs:OnChanged(targetConfig : string | {string}, callback : 
 	end)
 end
 
-function InternalConfigs:_checkConfigChanged(configs, path, value) : boolean
-	configs = configs or ActiveConfigs.DevConfigs
+function InternalConfigs:_checkConfigChanged(oldConfigs, path, value) : boolean
+	oldConfigs = oldConfigs or ActiveConfigs.DevConfigs
 
-	local oldValue = self:Get(path, configs)
+	local oldValue = self:Get(path, oldConfigs)
 	-- Config table reference is overwritten, don't actually need to set values -- save iteration.
 	--local location, lastKey = shared.GBMod("InternalConfigs").getEndpointFromPath(config, configs)
 	--location[lastKey] = value
@@ -230,7 +230,7 @@ function InternalConfigs:CopyConfigs()
 end
 
 -- Get the value of a specific config
-function InternalConfigs:Get(path : string | { string }, configs : any) : any
+function InternalConfigs:Get(path : string | { string }, configs : any?) : any
 	if typeof(path) ~= "table" and typeof(path) ~= "string" then
 		Utilities.GBWarn("Config path must be a string or list of strings.")
 		return nil
@@ -238,7 +238,7 @@ function InternalConfigs:Get(path : string | { string }, configs : any) : any
 	
 	self:WaitForConfigsReady()
 
-	local location, lastKey = self:GetEndpointFromPath(path, ActiveConfigs.DevConfigs)
+	local location, lastKey = self:GetEndpointFromPath(path, configs or ActiveConfigs.DevConfigs)
 
 	if not location or not lastKey then
 		return nil

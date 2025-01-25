@@ -29,6 +29,24 @@ export type Signal = {
     Destroy : (self : Signal) -> ()
 }
 
+--= Internal Functions =--
+
+local function DeepCopy(t : any) : any
+    if type(t) ~= "table" then
+        return t
+    end
+
+    local copy = {}
+    for k, v in pairs(t) do
+        if type(v) == "table" then
+            copy[k] = DeepCopy(v)
+        else
+            copy[k] = v
+        end
+    end
+    return copy
+end
+
 --= Constructor =--
 
 function Signal.new() : Signal
@@ -93,7 +111,12 @@ end
 
 function Signal:Fire(...)
     for _, callbackData in ipairs(self._callbacks) do
-        task.spawn(callbackData.callback, ...)
+        local dataToSend = {}
+        for _, data in ipairs({...}) do
+            table.insert(dataToSend, DeepCopy(data))
+        end
+
+        task.spawn(callbackData.callback, unpack(dataToSend))
         if callbackData.isOnce then
             callbackData.connection:Disconnect()
         end
