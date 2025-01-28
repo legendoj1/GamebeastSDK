@@ -120,8 +120,9 @@ end
 --= Initializers =--
 function ClientConfigs:Init()
 
-    ConfigChangedRemote.OnClientEvent:Connect(function(path, newValue, oldValue)
+    ConfigChangedRemote.OnClientEvent:Connect(function(path, newValue)
         if not ConfigsReady then return end
+        local oldValue = self:Get(path)
 
         local target = CachedConfigs
         for index, pathSegment in path do

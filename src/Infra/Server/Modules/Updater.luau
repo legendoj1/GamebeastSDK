@@ -30,7 +30,6 @@ local GBRequests = shared.GBMod("GBRequests")
 local ABTesting = shared.GBMod("ABTesting")
 local Utilities = shared.GBMod("Utilities")
 local InternalConfigs = shared.GBMod("InternalConfigs") ---@module InternalConfigs
-local GetRemote = shared.GBMod("GetRemote")
 local Signal = shared.GBMod("Signal")
 
 --= Types =--
@@ -101,7 +100,7 @@ function Updater:UpdateConfigs(newConfigs, init)
 
 	-- Integrate new configs
 
-	InternalConfigs:ApplyConfigs(configsToIntegrate, init)
+	InternalConfigs:ApplyConfigs(configsToIntegrate, (newConfigs.options.privacy or {}), init)
 
 
 

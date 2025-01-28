@@ -44,6 +44,7 @@ local ActiveConfigs = {
 	--Set of client accessible configs
 	ClientConfigs = {}
 }
+local CurrentClientPrivacy = {}
 --[[ Full dev defined configuration profile
 ActiveConfigs.DevConfigs = {}
 -- Metadata sent along with dev defined configs
@@ -55,9 +56,84 @@ configsMod.clientConfigs = {}]]
 
 --= Internal Functions =--
 
+local function IsPathPrivate(path : {string}) : boolean
+	for _, privacyPath in CurrentClientPrivacy do -- a, d, e
+		if #privacyPath > #path then
+			continue
+		end
+
+		local match = true
+		for index, pathSegment in ipairs(path) do -- a, d
+			if pathSegment ~= privacyPath[index] then
+				match = false
+				break
+			end
+		end
+
+		if match then
+			return true
+		end
+	end
+
+	return false
+end
+
+local function FilterConfigForClient(path : {string}, config : {[string] : any}) : {[string] : any}
+	if type(config) ~= "table" then
+		return config
+	end
+
+	local configCopy = Utilities.recursiveCopy(config)
+	local privacyConfig = CurrentClientPrivacy
+
+	-- Determine if the path is a match for any privacy paths
+	local targetPaths = {}
+	for _, privacyPath in privacyConfig do -- a, d, e
+		local match = true
+		for index, pathSegment in ipairs(path) do -- a, d
+			if pathSegment ~= privacyPath[index] then
+				match = false
+				break
+			end
+		end
+
+		if match then
+			local relativePath = table.clone(privacyPath)
+			for _=1, #path do
+				table.remove(relativePath, 1)
+			end
+
+			table.insert(targetPaths, relativePath)
+		end
+	end
+
+	-- Remove any paths that are marked as private
+	for _, targetPath in targetPaths do
+		local target = configCopy
+		for index, pathSegment in targetPath do
+			if index == #targetPath then
+				target[pathSegment] = nil
+				break
+			else
+				target = target[pathSegment]
+
+				if target == nil then
+					Utilities.GBWarn("Privacy path ".. table.concat(targetPath, ".").. " does not exist in config.")
+					break
+				end
+			end
+		end
+	end
+
+	return configCopy
+end
+
 local function SendConfigUpdateSignal(path, newValue, oldValue)
 	ConfigUpdatedSignal:Fire(path, newValue, oldValue)
-	ConfigChangedRemote:FireAllClients(path, newValue, oldValue)
+
+	if not IsPathPrivate(path) then
+		ConfigChangedRemote:FireAllClients(path, FilterConfigForClient(path, newValue))
+	end
 end
 
 --= API Functions =--
@@ -98,33 +174,36 @@ function InternalConfigs:OnChanged(targetConfig : string | {string}, callback : 
 	end)
 end
 
-function InternalConfigs:_checkConfigChanged(oldConfigs, path, value) : boolean
-	oldConfigs = oldConfigs or ActiveConfigs.DevConfigs
+function InternalConfigs:_checkConfigChanged(old, new, _path : {string}?)
+	_path = _path or {}
+	for oldKey, oldValue in old do
+		local currentPath = table.clone(_path)
+		table.insert(currentPath, oldKey)
 
-	local oldValue = self:Get(path, oldConfigs)
-	-- Config table reference is overwritten, don't actually need to set values -- save iteration.
-	--local location, lastKey = shared.GBMod("InternalConfigs").getEndpointFromPath(config, configs)
-	--location[lastKey] = value
-
-
-	local hasChanged = false
-	local valueType = typeof(value)
-
-	if valueType == "table" then
-		if valueType ~= typeof(oldValue) then
-			hasChanged = true
-		else
-			hasChanged = not Utilities.tableEqualityCheck(value, oldValue)
+		local newValue = new[oldKey]
+		if newValue == nil then -- Removed
+			SendConfigUpdateSignal(currentPath, nil, oldValue)
+		elseif type(newValue) ~= type(oldValue) then -- Changed type
+			SendConfigUpdateSignal(currentPath, newValue, oldValue)
+		elseif type(newValue) == "table" then -- Recurse
+			self:_checkConfigChanged(oldValue, newValue, currentPath)
+		elseif newValue ~= oldValue then -- Changed
+			SendConfigUpdateSignal(currentPath, newValue, oldValue)
 		end
-	else
-		hasChanged = value ~= oldValue
+
+		--NOTE: could optimize by using the same table
+		--table.remove(path, #path)
 	end
 
-	if hasChanged then
-		SendConfigUpdateSignal(path, value, oldValue)
-	end
+	-- check if added
+	for newKey, newValue in new do
+		local currentPath = table.clone(_path)
+		table.insert(currentPath, newKey)
 
-	return hasChanged
+		if old[newKey] == nil then -- Added
+			SendConfigUpdateSignal(currentPath, newValue, nil)
+		end
+	end
 end
 
 function InternalConfigs:ApplyInternalConfigs(newGBConfigs)
@@ -137,81 +216,37 @@ function InternalConfigs:ApplyInternalConfigs(newGBConfigs)
 	--EventDataUpdatedRemote:FireAllClients(newConfigs["GBEventData"])
 end
 
-function InternalConfigs:ApplyConfigs(newConfigs, init : boolean?)
-	local updatedBranches = {}
+function InternalConfigs:ApplyConfigs(newConfigs, privacyConfig : { {string} }, init : boolean?)
 	local oldConfigs = ActiveConfigs.DevConfigs
 	
+	CurrentClientPrivacy = privacyConfig --{{"a", "c"}, {"a", "d", "e"}} --  
 	-- We can't recurse over a "config metadata object" unless we make a reserved key for the metadata and preserve the structure of the config object
 	-- Create a config-wide metadata key to avoid collisions with config object structure.
 	-- Can store metadata + key in configs mod in the future if there's other relevant metadata we want to access at any time.
 	--local metadataKey = httpService:GenerateGUID(false)
 	--local configMetadata = {}
 
-	-- Inner recursive function for config traversal and value change detection. Also splits config values from metadata.
-	local function innerFunc(configs, depthIndex)
-		local hasChanged
+	
+	-- Check if key has been removed from config
 
-		for index, value in configs do
-			-- Drop metadata completely and proceed as old implementation
-			--value = value[1]
-			--configs[index] = value
-			table.insert(depthIndex, index)
-
-			local path = #depthIndex > 1 and depthIndex or depthIndex[1]
-			
-			if typeof(value) == "table" then
-				-- Piggy back off traversal and deeply make newConfigs read only
-				if not table.isfrozen(value) then
-					table.freeze(value)
-				end
-
-				local res = innerFunc(value, depthIndex)
-				hasChanged = hasChanged or res
-			else
-				local res = if init then false else self:_checkConfigChanged(oldConfigs, path, value)
-				--local res = updaterMod.checkConfigChanged(oldConfigs, oldClientConfigs, newConfigs, newClientConfigs, path, init)
-				hasChanged = hasChanged or res
-			end
-
-			table.remove(depthIndex, #depthIndex)
-		end
-
-		-- Notify up the branch if something in it changed but at most once even if multiple changes
-		if #depthIndex > 0 then
-			-- Use concat as we actually want the state of depthIndex as the branch key. Can't use table itself or string ref because we're actually only ever using one table.
-			local branchIndex = table.concat(depthIndex)
-			
-			-- Record change occured if one did and we haven't already recorded it
-			if hasChanged and not updatedBranches[branchIndex] then
-				updatedBranches[branchIndex] = Utilities.recursiveCopy(depthIndex)
-			end
-		end
-
-		return hasChanged
+	if init ~= true then
+		InternalConfigs:_checkConfigChanged(oldConfigs, newConfigs)
 	end
 
-	-- Begin recursive traversal
-	innerFunc(newConfigs, {})
-
-	-- Iterate over updated branches and notify as needed
-	for _, depthIndex in updatedBranches do
-		local newVal = self:Get(depthIndex, newConfigs)
-		local oldVal
-		
-		if Utilities.tableEqualityCheck(oldConfigs, {}) then
-			oldVal = nil
-		else
-			self:Get(depthIndex, oldConfigs)
+	-- Freeze new configs to prevent modification
+	local function recursiveFreeze(configs)
+		table.freeze(configs)
+		for _, value in configs do
+			if type(value) == "table" then
+				recursiveFreeze(value)
+			end
 		end
-		
-		SendConfigUpdateSignal(depthIndex, newVal, oldVal)
-		-- Can just be replaced with this line with metadata update
-		--sendConfigUpdateSignal(oldConfigs, oldClientConfigs, newConfigs, newClientConfigs, depthIndex)
 	end
+
+	recursiveFreeze(newConfigs)
 
 	ActiveConfigs.DevConfigs = newConfigs
 	-- Freeze highest level table not referenced in traversal
-	table.freeze(newConfigs)
 	
 	--shared.GBMod("InternalConfigs").clientConfigs = newClientConfigs
 	---- Freeze highest level table not referenced in traversal
@@ -289,10 +324,14 @@ function InternalConfigs:Init()
 	GetConfigRemoteFunc.OnServerInvoke = function(_, path)
 		self:WaitForConfigsReady()
 		if path == nil then
-			return ActiveConfigs.DevConfigs
+			return FilterConfigForClient({}, ActiveConfigs.DevConfigs)
 		end
 
-		return self:Get(path)
+		if IsPathPrivate(path) then
+			return nil
+		end
+
+		return FilterConfigForClient(path, self:Get(path))
 		-- NOTE: We'll want to modify to reflect privacy. To be most efficient, we can create a get function that references a
 		-- "client" config set that essentially recursively copies the set of configs only assigning a value if it has client accessibility.
 		-- This means we only every make one copy of a table rather than on every client request.
