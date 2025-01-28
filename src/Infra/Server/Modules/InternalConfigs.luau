@@ -29,7 +29,7 @@ local GetEventDataRemoteFunc = GetRemote("Function", "GetEventData")
 local EventDataUpdatedRemote = GetRemote("Event", "EventDataUpdated")
 local ConfigChangedRemote = GetRemote("Event", "ConfigChanged")
 local ConfigReadySignal = Signal.new()
-local ConfigUpdatedSignal = Signal.new()
+local BatchConfigUpdatedSignal = Signal.new()
 
 --= Constants =--
 
@@ -128,14 +128,6 @@ local function FilterConfigForClient(path : {string}, config : {[string] : any})
 	return configCopy
 end
 
-local function SendConfigUpdateSignal(path, newValue, oldValue)
-	ConfigUpdatedSignal:Fire(path, newValue, oldValue)
-
-	if not IsPathPrivate(path) then
-		ConfigChangedRemote:FireAllClients(path, FilterConfigForClient(path, newValue))
-	end
-end
-
 --= API Functions =--
 
 function InternalConfigs:IsReady() : boolean
@@ -158,52 +150,72 @@ function InternalConfigs:WaitForConfigsReady() : true
 end
 
 function InternalConfigs:OnChanged(targetConfig : string | {string}, callback : (newValue : any, oldValue : any) -> ()) : RBXScriptConnection
+	if type(targetConfig) == "string" then
+		targetConfig = {targetConfig}
+	end
 
 	-- Establish bindable connection
-	return ConfigUpdatedSignal:Connect(function(changedPath, newValue, oldValue)
-		local isMatchingTable
+	return BatchConfigUpdatedSignal:Connect(function(changes : {{path : {string}, newValue : any, oldValue : any}}, oldConfigs : any)
+		for _, change in changes do
+			local match = true
+			for index, path in targetConfig do
+				if path ~= change.path[index] then
+					match = false
+					break
+				end
+			end
 
-		if typeof(targetConfig) == "table" and typeof(changedPath) == "table" then
-			isMatchingTable = Utilities.tableEqualityCheck(targetConfig, changedPath)
-		end
-
-		if isMatchingTable or targetConfig == changedPath then
-			-- Has changed condition checked by "set" before firing bindable
-			callback(newValue, oldValue)
+			if match then
+				callback(self:Get(targetConfig), self:Get(targetConfig, oldConfigs))
+				break
+			end
 		end
 	end)
 end
 
-function InternalConfigs:_checkConfigChanged(old, new, _path : {string}?)
-	_path = _path or {}
-	for oldKey, oldValue in old do
-		local currentPath = table.clone(_path)
-		table.insert(currentPath, oldKey)
+function InternalConfigs:_checkConfigChanged(oldConfig, newConfig) : { {path : {string}, newValue : any, oldValue : any} }
+	local changedBatch = {} :: {{path : {string}, newValue : any, oldValue : any}}
 
-		local newValue = new[oldKey]
-		if newValue == nil then -- Removed
-			SendConfigUpdateSignal(currentPath, nil, oldValue)
-		elseif type(newValue) ~= type(oldValue) then -- Changed type
-			SendConfigUpdateSignal(currentPath, newValue, oldValue)
-		elseif type(newValue) == "table" then -- Recurse
-			self:_checkConfigChanged(oldValue, newValue, currentPath)
-		elseif newValue ~= oldValue then -- Changed
-			SendConfigUpdateSignal(currentPath, newValue, oldValue)
-		end
-
-		--NOTE: could optimize by using the same table
-		--table.remove(path, #path)
+	local function addToBatch(path, newValue, _)
+		table.insert(changedBatch, {path = path, newValue = newValue})
 	end
 
-	-- check if added
-	for newKey, newValue in new do
-		local currentPath = table.clone(_path)
-		table.insert(currentPath, newKey)
+	local function recursiveChangedFinder(old, new, _path)
+		_path = _path or {}
 
-		if old[newKey] == nil then -- Added
-			SendConfigUpdateSignal(currentPath, newValue, nil)
+		for oldKey, oldValue in old do
+			local currentPath = table.clone(_path)
+			table.insert(currentPath, oldKey)
+
+			local newValue = new[oldKey]
+			if newValue == nil then -- Removed
+				addToBatch(currentPath, nil, oldValue)
+			elseif type(newValue) ~= type(oldValue) then -- Changed type
+				addToBatch(currentPath, newValue, oldValue)
+			elseif type(newValue) == "table" then -- Recurse
+				recursiveChangedFinder(oldValue, newValue, currentPath)
+			elseif newValue ~= oldValue then -- Changed
+				addToBatch(currentPath, newValue, oldValue)
+			end
+
+			--NOTE: could optimize by using the same table
+			--table.remove(path, #path)
+		end
+
+		-- check if added
+		for newKey, newValue in new do
+			local currentPath = table.clone(_path)
+			table.insert(currentPath, newKey)
+
+			if old[newKey] == nil then -- Added
+				addToBatch(currentPath, newValue, nil)
+			end
 		end
 	end
+
+	recursiveChangedFinder(oldConfig, newConfig)
+
+	return changedBatch
 end
 
 function InternalConfigs:ApplyInternalConfigs(newGBConfigs)
@@ -217,9 +229,9 @@ function InternalConfigs:ApplyInternalConfigs(newGBConfigs)
 end
 
 function InternalConfigs:ApplyConfigs(newConfigs, privacyConfig : { {string} }, init : boolean?)
-	local oldConfigs = ActiveConfigs.DevConfigs
+	local oldConfigs = Utilities.recursiveCopy(ActiveConfigs.DevConfigs)
 	
-	CurrentClientPrivacy = privacyConfig --{{"a", "c"}, {"a", "d", "e"}} --  
+	CurrentClientPrivacy =  privacyConfig--{{"a", "c"}, {"a", "d", "e"}} --  
 	-- We can't recurse over a "config metadata object" unless we make a reserved key for the metadata and preserve the structure of the config object
 	-- Create a config-wide metadata key to avoid collisions with config object structure.
 	-- Can store metadata + key in configs mod in the future if there's other relevant metadata we want to access at any time.
@@ -227,12 +239,6 @@ function InternalConfigs:ApplyConfigs(newConfigs, privacyConfig : { {string} }, 
 	--local configMetadata = {}
 
 	
-	-- Check if key has been removed from config
-
-	if init ~= true then
-		InternalConfigs:_checkConfigChanged(oldConfigs, newConfigs)
-	end
-
 	-- Freeze new configs to prevent modification
 	local function recursiveFreeze(configs)
 		table.freeze(configs)
@@ -244,8 +250,27 @@ function InternalConfigs:ApplyConfigs(newConfigs, privacyConfig : { {string} }, 
 	end
 
 	recursiveFreeze(newConfigs)
-
 	ActiveConfigs.DevConfigs = newConfigs
+
+	if init ~= true then
+		local changedBatch = InternalConfigs:_checkConfigChanged(oldConfigs, newConfigs)
+
+		if #changedBatch > 0 then
+			BatchConfigUpdatedSignal:Fire(changedBatch, oldConfigs)
+
+			local filteredChanges = {}
+			for _, change in changedBatch do
+				if not IsPathPrivate(change.path) then
+					change.newValue = FilterConfigForClient(change.path, change.newValue)
+					table.insert(filteredChanges, change)
+				end
+			end
+
+			ConfigChangedRemote:FireAllClients(filteredChanges)
+		end
+	end
+
+	
 	-- Freeze highest level table not referenced in traversal
 	
 	--shared.GBMod("InternalConfigs").clientConfigs = newClientConfigs
@@ -265,21 +290,28 @@ function InternalConfigs:CopyConfigs()
 end
 
 -- Get the value of a specific config
-function InternalConfigs:Get(path : string | { string }, configs : any?) : any
+function InternalConfigs:Get(path : string | { string }, configsOverride : any?) : any
 	if typeof(path) ~= "table" and typeof(path) ~= "string" then
 		Utilities.GBWarn("Config path must be a string or list of strings.")
 		return nil
 	end
+
+	path = typeof(path) == "string" and {path} or path
 	
-	self:WaitForConfigsReady()
-
-	local location, lastKey = self:GetEndpointFromPath(path, configs or ActiveConfigs.DevConfigs)
-
-	if not location or not lastKey then
-		return nil
+	if not configsOverride then
+		self:WaitForConfigsReady()
 	end
-	
-	return location[lastKey]
+
+	local value = configsOverride or ActiveConfigs.DevConfigs
+	for _, key in ipairs(path) do
+		value = value[key]
+
+		if value == nil then
+			return nil
+		end
+	end
+
+	return value
 end
 
 function InternalConfigs:GetActiveConfig(key : string) : any
@@ -295,26 +327,6 @@ function InternalConfigs:GetEventData(eventName : string) : { [string] : any }
 	end
 	
 	return info
-end
-
-function InternalConfigs:GetEndpointFromPath(path, configs)
-	if not (typeof(path) == "table") then
-		return configs or ActiveConfigs.DevConfigs, path
-	elseif #path == 1 then
-		return configs or ActiveConfigs.DevConfigs, path[1]
-	end
-
-	local endpoint = self:Get(path[1], configs) --NOTE: why is this recursive?
-
-	for i = 2, #path - 1 do
-		if not endpoint then
-			return nil, nil
-		end
-
-		endpoint = endpoint[path[i]]
-	end
-
-	return endpoint, path[#path]
 end
 
 --= Initializers =--

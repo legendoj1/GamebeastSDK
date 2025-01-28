@@ -41,24 +41,16 @@ local ConfigsReady = false
 
 --= Internal Functions =--
 
-local function AreTablesEqual(table1, table2)
-    if typeof(table1) ~= "table" or typeof(table2) ~= "table" then
-        return false
-    end
-
-    for key, value in pairs(table1) do
-        if table2[key] ~= value then
-            return false
+local function DeepCopy(object)
+    local newObject = {}
+    for key, value in pairs(object) do
+        if type(value) == "table" then
+            newObject[key] = DeepCopy(value)
+        else
+            newObject[key] = value
         end
     end
-
-    for key, value in pairs(table2) do
-        if table1[key] ~= value then
-            return false
-        end
-    end
-
-    return true
+    return newObject
 end
 
 --= API Functions =--
@@ -69,7 +61,7 @@ function ClientConfigs:WaitForConfigsReady()
 	end
 end
 
-function ClientConfigs:Get(path : string | { string })
+function ClientConfigs:Get(path : string | { string }, _configs : any?)
     if typeof(path) ~= "table" and typeof(path) ~= "string" then
 		error("Config path must be a string or list of strings.")
 		return nil
@@ -81,7 +73,7 @@ function ClientConfigs:Get(path : string | { string })
         path = {path}
     end
 	
-    local target = CachedConfigs
+    local target = _configs or CachedConfigs
 	for _, key in path do
         if not target[key] then
             return nil
@@ -93,18 +85,26 @@ function ClientConfigs:Get(path : string | { string })
 end
 
 function ClientConfigs:OnChanged(targetConfig : string | {string}, callback : (newValue : any, oldValue : any) -> ()) : RBXScriptConnection
-    return ConfigUpdatedSignal:Connect(function(changedPath, newValue, oldValue)
-		local isMatchingTable
+    if type(targetConfig) == "string" then
+        targetConfig = {targetConfig}
+    end
 
-		if typeof(targetConfig) == "table" and typeof(changedPath) == "table" then
-			isMatchingTable = AreTablesEqual(targetConfig, changedPath)
-		end
+    return ConfigUpdatedSignal:Connect(function(changes : { { path : {string}, newValue : any, oldValue : any}}, oldConfigs : any)
+        for _, change in changes do
+            local match = true
+            for index, pathSegment in targetConfig do
+                if change.path[index] ~= pathSegment then
+                    match = false
+                    break
+                end
+            end
 
-		if isMatchingTable or targetConfig == changedPath then
-			-- Has changed condition checked by "set" before firing bindable
-			callback(newValue, oldValue)
-		end
-	end)
+            if match then
+                callback(self:Get(targetConfig), self:Get(targetConfig, oldConfigs))
+                break
+            end
+        end
+    end)
 end
 
 function ClientConfigs:OnReady(callback : (configs : any) -> ()) : RBXScriptSignal
@@ -119,28 +119,23 @@ end
 
 --= Initializers =--
 function ClientConfigs:Init()
-
-    ConfigChangedRemote.OnClientEvent:Connect(function(path, newValue)
+    ConfigChangedRemote.OnClientEvent:Connect(function(changes : { { path : {string}, newValue : any}})
         if not ConfigsReady then return end
-        local oldValue = self:Get(path)
 
-        local target = CachedConfigs
-        for index, pathSegment in path do
-            if index == #path then
-                target[pathSegment] = newValue
-            else
-                target = target[pathSegment]
+        local oldConfigs = DeepCopy(CachedConfigs)
 
-                -- Temp
-                if target == nil then
-                    CachedConfigs = GetConfigRemoteFunc:InvokeServer()
-                    break
+        for _, change in changes do
+            local target = CachedConfigs
+            for index, pathSegment in change.path do
+                if index == #change.path then
+                    target[pathSegment] = change.newValue
+                else
+                    target = target[pathSegment]
                 end
-                --TODO: This is a problem if the path is invalid and the config changes completely.
             end
         end
 
-        ConfigUpdatedSignal:Fire(path, newValue, oldValue)
+        ConfigUpdatedSignal:Fire(changes, oldConfigs)
     end)
 
     task.spawn(function()
@@ -149,7 +144,6 @@ function ClientConfigs:Init()
         ConfigsReady = true
         ConfigReadySignal:Fire(CachedConfigs)
     end)
-    
 end
 
 --= Return Module =--
