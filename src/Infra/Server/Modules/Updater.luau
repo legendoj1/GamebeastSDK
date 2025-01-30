@@ -138,11 +138,19 @@ end
 --= Initializers =--
 function Updater:Init()
 	-- Start up, ask for most recent configuations
-	local newConfigsResp, req = GBRequests:GBRequestAsync("sdk/configurations", nil, 1)
-	local newConfigs
 
+	local function fetchConfigs()
+		local newConfigsResp, req = GBRequests:GBRequestAsync("sdk/configurations", nil, 1)
+		if req and req.StatusCode == 200 then
+			return newConfigsResp.args
+		else
+			return nil
+		end
+	end
+
+	local newConfigs = fetchConfigs()
 	-- If no response or failed status, attempt to recover
-	if not req or req.StatusCode ~= 200 then
+	if not newConfigs then
 		Utilities.GBWarn("Couldn't get configurations from Gamebeast. Attempting to load from backup...")
 		-- Try to get datastore backed up configs
 		newConfigs = self:GetBackupConfigs()
@@ -152,16 +160,14 @@ function Updater:Init()
 			repeat
 				task.wait(10)
 				Utilities.GBWarn("Attempting to establish connection...")
-				newConfigs = GBRequests:GBRequestAsync("sdk/configurations", nil, 0)
+				newConfigs = fetchConfigs()
 			until newConfigs
 			print("Connection with Gamebeast re-established! Loading newest configs...")
 		else
 			print("Backup configs loaded successfully!")
 		end
-	else
-		-- Good response, proceed
-		newConfigs = newConfigsResp.args
 	end
+
 
 	-- Update configs for server with initialization flag
 	self:UpdateConfigs(newConfigs, true)

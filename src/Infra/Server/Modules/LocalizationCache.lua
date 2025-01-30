@@ -52,7 +52,9 @@ function LocalizationCache:GetRegionId(player : Player | number)
         return LocalizationService:GetCountryRegionForPlayerAsync(player)
     end)
 
-    Cache[player].regionId = regionId
+    if Cache[player] then
+        Cache[player].regionId = regionId
+    end
 
     return regionId or "unknown"
 end
@@ -72,7 +74,9 @@ function LocalizationCache:GetLocaleId(player : Player | number)
         return LocalizationService:GetTranslatorForPlayer(player).LocaleId
     end)
 
-    Cache[player].localeId = localeId
+    if Cache[player] then
+        Cache[player].localeId = localeId
+    end
 
     return localeId or "unknown"
 end
