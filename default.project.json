@@ -6,14 +6,21 @@
     "ReplicatedStorage": {
       "$className": "ReplicatedStorage",
       "Gamebeast": {
-        "$path": "src/Gamebeast"
+        "$path": "src"
       }
     },
 
     "ServerScriptService": {
       "$className": "ServerScriptService",
-      "GamebeastSDK": {
-        "$path": "src/GamebeastSDK"
+      "StartTest": {
+        "$path": "tests/StartTest.server.luau"
+      }
+    },
+
+    "ReplicatedFirst": {
+      "$className": "ReplicatedFirst",
+      "Tests": {
+        "$path": "tests"
       }
     }
   }
