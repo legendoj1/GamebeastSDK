@@ -57,8 +57,8 @@ Updater.ConfigChanged = Signal.new()
 
 -- Update modules based on config data in new module version
 function Updater:UpdateConfigs(newConfigs, init)
-	local GBConfigs = InternalConfigs:GetActiveConfig("GBConfigs")
-	local lastVersion = not init and GBConfigs["GBPublishTime"] or nil
+	local currentGBConfigs = InternalConfigs:GetActiveConfig("GBConfigs")
+	local lastVersion = not init and currentGBConfigs["GBPublishTime"] or nil
 	
 	-- If we got an old configuration version over the wire for some reason, don't apply it
 	if lastVersion and newConfigs["GBConfigs"]["GBPublishTime"] <= lastVersion then

@@ -110,7 +110,10 @@ function Signal:Wait() : ...any
 end
 
 function Signal:Fire(...)
-    for _, callbackData in ipairs(self._callbacks) do
+    local lastLength = #self._callbacks
+    local currentIndex = 1
+    while currentIndex <= #self._callbacks do
+        local callbackData = self._callbacks[currentIndex]
         local dataToSend = {}
         for _, data in ipairs({...}) do
             table.insert(dataToSend, DeepCopy(data))
@@ -120,6 +123,10 @@ function Signal:Fire(...)
         if callbackData.isOnce then
             callbackData.connection:Disconnect()
         end
+
+        local newLength = #self._callbacks
+        currentIndex += (1 - (lastLength - newLength))
+        lastLength = newLength
     end
 end
 

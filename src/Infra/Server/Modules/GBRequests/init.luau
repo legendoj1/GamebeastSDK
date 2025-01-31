@@ -378,8 +378,8 @@ function GBRequests:Init()
 			-- Get requests from Gamebeast. Soon-to-be legacy?
 			local newRequests, resp = self:GBRequestAsync("sdk/requests")
 
-			if not newRequests or (resp["error"] or resp["StatusCode"] ~= 200) then
-				if tick() - lastReqWarning >= 10 and resp["StatusCode"] ~= 403 then
+			if not newRequests or not resp or (resp["error"] or resp["StatusCode"] ~= 200) then
+				if tick() - lastReqWarning >= 10 and (resp == nil or resp["StatusCode"] ~= 403) then
 					Utilities.GBWarn("Issue getting new requests from Gamebeast dashboard. Check status.gamebeast.gg and status.roblox.com.")
 					lastReqWarning = tick()
 				end
