@@ -73,30 +73,30 @@ local function RequireModule(moduleData : ModuleData)
 	return module
 end
 
-local function AddModules(modulesFolder : Instance)
+local function AddModule(module : ModuleScript, isPublic : boolean?)
+	if isPublic then
+		PublicModules[module.Name] = {
+			Name = module.Name,
+			Instance = module,
+		}
+	else
+		local moduleData = {
+			Name = module.Name,
+			Instance = module,
+			Loaded = false,
+			Module = nil,
+		}
 
-	local function addModule(module : ModuleScript, isPublic : boolean?)
-		if isPublic then
-			PublicModules[module.Name] = {
-				Name = module.Name,
-				Instance = module,
-			}
-		else
-			local moduleData = {
-				Name = module.Name,
-				Instance = module,
-				Loaded = false,
-				Module = nil,
-			}
-
-			Modules[module.Name] = moduleData
-		end
+		Modules[module.Name] = moduleData
 	end
+end
+
+local function AddModuleFolder(modulesFolder : Instance)
 
 	local function search(folder : Folder, isPublic : boolean?)
 		for _, module in ipairs(folder:GetChildren()) do
 			if module:IsA("ModuleScript") then
-				addModule(module, isPublic)
+				AddModule(module, isPublic)
 			end
 			search(module, isPublic)
 		end
@@ -107,7 +107,7 @@ local function AddModules(modulesFolder : Instance)
 
 	local function moduleAddedLate(module : ModuleScript, public : boolean?)
 		if module:IsA("ModuleScript") then
-			addModule(module, public)
+			AddModule(module, public)
 			if DidRequire and not public then
 				RequireModule(Modules[module.Name])
 			end
@@ -147,8 +147,10 @@ local function StartSDK()
 
 	local targetModules = IsServer and script.Infra.Server or script.Infra.Client
 
-	AddModules(targetModules)
-	AddModules(script.Infra.Shared)
+	AddModuleFolder(targetModules)
+	AddModuleFolder(script.Infra.Shared)
+
+	AddModule(script.Infra:WaitForChild("MetaData"))
 
 	-- Set settings
 

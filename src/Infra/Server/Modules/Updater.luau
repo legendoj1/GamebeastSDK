@@ -1,11 +1,6 @@
 -- The Gamebeast SDK is Copyright © 2023 Gamebeast, Inc. to present.
 -- All rights reserved.
 
--- So the current problem with Updater is that it is updating the modules instead of having the modules update themselves based on signals from Updater.
--- This is a problem because it is not following the Observer pattern. 
--- The Observer pattern is a behavioral design pattern that defines a one-to-many dependency between objects so that when one object changes state, all its dependents are notified and updated automatically.
-
-
 --[[
 	The Gamebeast SDK is Copyright © 2023 Gamebeast, Inc. to present.
 	All rights reserved.
@@ -31,6 +26,7 @@ local ABTesting = shared.GBMod("ABTesting")
 local Utilities = shared.GBMod("Utilities")
 local InternalConfigs = shared.GBMod("InternalConfigs") ---@module InternalConfigs
 local Signal = shared.GBMod("Signal")
+local MetaData = shared.GBMod("MetaData") ---@module MetaData
 
 --= Types =--
 
@@ -137,6 +133,17 @@ end
 
 --= Initializers =--
 function Updater:Init()
+
+	-- Check version
+	task.spawn(function()
+		local versionData = GBRequests:GBRequestAsync("sdk/latest/version?platform=roblox")
+		if versionData and versionData.version then
+			if MetaData.version < versionData.version then
+				Utilities.GBWarn(`Gamebeast SDK is out of date! Please update to the latest version. {MetaData.version} -> {versionData.version}`)
+			end
+		end
+	end)
+
 	-- Start up, ask for most recent configuations
 
 	local function fetchConfigs()

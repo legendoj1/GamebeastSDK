@@ -54,6 +54,7 @@ local ENDPOINTS = {
 			["sdk/configurations"] = "GET",
 			["sdk/heatmap"] = "POST",
 			["sdk/heatmap/waypoint"] = "POST",
+			["sdk/latest/version?platform=roblox"] = "GET"
 		}
 	}
 }
@@ -215,7 +216,7 @@ function GBRequests:GBRequestAsync(requestType : string, args : {[string] : any}
 	RequestProcessingCount -= 1
 
 	if response and #response.Body > 0 then
-		if response.StatusCode == 401 or response.StatusCode == 403 and not keyWarningGiven then
+		if (response.StatusCode == 401 or response.StatusCode == 403 or response.StatusCode == 429) and not keyWarningGiven then
 			Utilities.GBWarn("Gamebeast project key invalid or not set! Set your project key in the :Setup method.")
 			keyWarningGiven = true
 		end
