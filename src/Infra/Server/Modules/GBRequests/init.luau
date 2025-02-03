@@ -25,6 +25,7 @@ local Utilities = shared.GBMod("Utilities")
 local Queue = shared.GBMod("Queue")
 local DataCache = shared.GBMod("DataCache")
 local Signal = shared.GBMod("Signal") ---@module Signal
+local MetaData = shared.GBMod("MetaData") ---@module MetaData
 
 --= Types =--
 
@@ -173,7 +174,7 @@ function GBRequests:GBRequestAsync(requestType : string, args : {[string] : any}
 	local headers = {
 		["authorization"] = authKey,
 		["isstudio"] = tostring(RunService:IsStudio()),
-		["sdkversion"] = "NA", --TODO: Get SDK version from attribute on SDK.
+		["sdkversion"] = MetaData.version,
 		["universeid"] = tostring(game.GameId),
 		-- optional, to be removed with A/B testing overhaul
 		["partitionid"] = partition ~= "" and partition or nil,

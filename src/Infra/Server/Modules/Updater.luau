@@ -18,6 +18,7 @@ local Updater = { }
 --= Roblox Services =--
 local DataStoreService = game:GetService("DataStoreService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 --= Dependencies =--
 
@@ -32,7 +33,7 @@ local MetaData = shared.GBMod("MetaData") ---@module MetaData
 
 --= Constants =--
 
-local BACKUP_STORE_KEY = "GBConfigBackup"
+local BACKUP_STORE_KEY = (RunService:IsStudio() and "Studio" or "") .. "GBConfigBackup"
 
 --= Object References =--
 
