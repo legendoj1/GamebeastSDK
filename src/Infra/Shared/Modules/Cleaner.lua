@@ -1,0 +1,62 @@
+--[[
+    The Gamebeast SDK is Copyright © 2023 Gamebeast, Inc. to present.
+    All rights reserved.
+
+    Cleaner.lua
+    
+    Description:
+        No description provided.
+    
+--]]
+
+--= Root =--
+
+local Cleaner = {}
+Cleaner.__index = Cleaner
+
+--= Roblox Services =--
+
+--= Dependencies =--
+
+--= Types =--
+
+--= Object References =--
+
+--= Constants =--
+
+--= Variables =--
+
+--= Internal Functions =--
+
+--= Constructor =--
+
+function Cleaner.new()
+    local self = setmetatable({}, Cleaner)
+
+    self._toClean = {}
+
+    return self
+end
+
+--= Methods =--
+
+function Cleaner:Add(object : Instance | RBXScriptConnection | {Destroy : () -> ()})
+    if typeof(object) == "table" and typeof(object.Destroy) ~= "function" then
+        error("Object does not have a Destroy method.")
+    end
+
+    table.insert(self._toClean, object)
+end
+
+Cleaner.Clean = Cleaner.Destroy
+function Cleaner:Destroy()
+    for _, object in ipairs(self._toClean) do
+        if typeof(object) == "RBXScriptConnection" then
+            object:Disconnect()
+        else
+            object:Destroy()
+        end
+    end
+end
+
+return Cleaner
