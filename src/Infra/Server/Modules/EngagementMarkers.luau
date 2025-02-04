@@ -61,6 +61,7 @@ local SessionIds = {}
 local CharConnections = {}
 local LastCharPositions = {}
 local LastEventReportTime = 0
+local ClientInfoWarned = false
 
 
 --= Public Variables =--
@@ -141,7 +142,7 @@ function EngagementMarkers:_createMarker(source : "server" | "client" | "sdk", m
 		["timestamp"] = DateTime.now().UnixTimestampMillis,
 		["type"] = markerType,
 		["userId"] = player.UserId, 
-		["sessionId"] = player.UserIdId and SessionIds[player.UserId] or nil,
+		["sessionId"] = player.UserId and SessionIds[player.UserId] or nil,
 		["value"] = value,
 		["properties"] = {
 			["origin"] = source,
@@ -171,22 +172,30 @@ function EngagementMarkers:_createMarker(source : "server" | "client" | "sdk", m
 			addMarker()
 		end
 		
-		local waitingData; waitingData = {
+		local waitingData = {
 			callback = resolved,
-			connection = ServerClientInfoHandler:OnClientInfoResolved(player, 5, function(timedout)
-				if timedout then
-					Utilities.GBWarn("Failed to resolve client info, did you forget to :Setup() Gamebeast SDK on the client?")
-				end
-
-				local index = table.find(WaitingPlayerMarkers, waitingData)
-				if index then
-					table.remove(WaitingPlayerMarkers, index)
-				end
-
-				resolved()
-			end)
+			connection = nil
 		}
 
+		local connection = ServerClientInfoHandler:OnClientInfoResolved(player, 5, function(timedout, ...)
+			if timedout and ClientInfoWarned == false then
+				Utilities.GBWarn("Failed to resolve client info, did you forget to :Setup() Gamebeast SDK on the client?")
+				ClientInfoWarned = true
+			end
+
+			local index = table.find(WaitingPlayerMarkers, waitingData)
+			if index then
+				table.remove(WaitingPlayerMarkers, index)
+			end
+
+			resolved()
+		end)
+
+		if not connection then
+			return
+		end
+
+		waitingData.connection = connection
 		table.insert(WaitingPlayerMarkers, waitingData)
 	else
 		addMarker()

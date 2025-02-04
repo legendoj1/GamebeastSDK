@@ -60,7 +60,7 @@ end
 
 function ServerClientInfoHandler:OnClientInfoResolved(player : Player, timeoutSeconds : number, callback : (timedout : boolean, info : { [string] : any }) -> nil)
     if ClientInfoCache[player] then
-        callback(table.clone(ClientInfoCache[player]))
+        callback(false, table.clone(ClientInfoCache[player]))
         return
     end
 

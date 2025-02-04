@@ -44,7 +44,6 @@ end
 
 --= Methods =--
 
-SignalConnection.Destroy = SignalConnection.Disconnect
 function SignalConnection:Disconnect()
     if self.Connected then
         task.spawn(self._callback)
@@ -52,5 +51,7 @@ function SignalConnection:Disconnect()
     
     self.Connected = false
 end
+
+SignalConnection.Destroy = SignalConnection.Disconnect
 
 return SignalConnection

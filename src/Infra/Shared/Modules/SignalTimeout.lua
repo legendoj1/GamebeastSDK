@@ -47,7 +47,7 @@ function SignalTimeout.new(timeoutSeconds : number, targetSignal : RBXScriptSign
 
     self._cleaner:Add(self._timedOutSignal)
     self._cleaner:Add(RunService.Heartbeat:Connect(function()
-        if tick() - self._startTick >= self._timeoutSeconds  then
+        if tick() - self._startTick >= self._timeoutSeconds then
             self._timedOutSignal:Fire(true)
             self:Destroy()
         end
