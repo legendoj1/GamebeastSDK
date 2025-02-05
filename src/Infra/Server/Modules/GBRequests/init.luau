@@ -40,22 +40,23 @@ local CACHE_EXPIRY_TIME = 30
 local MESSAGE_SIZE_LIMIT = 800
 -- Subscription topic name for direct requests from GB
 local GB_MESSAGING_TOPIC = "GB_REQ_MESSAGE"
+local URL_SUFFIX = "/sdk"
 local ENDPOINTS = {
 	{
-		URL = "https://api.gamebeast.gg", -- http://localhost:3001 -- https://api.gamebeast.gg -- https://api.stage.gamebeast.gg
+		URL = "https://api.gamebeast.gg" .. URL_SUFFIX, -- http://localhost:3001 -- https://api.gamebeast.gg -- https://api.stage.gamebeast.gg
 		Requests = {
-			["sdk/markers"] = "POST",
-			["users/create"] = "POST",
-			["health_check"] = "GET",
-			["jobs/create"] = "POST",
-			["sdk/requests"] = "GET",
-			["sdk/requests/completed"] = "POST",
-			["sdk/requests/started"] = "PUT",
-			["application/boot_info"] = "GET",
-			["sdk/configurations"] = "GET",
-			["sdk/heatmap"] = "POST",
-			["sdk/heatmap/waypoint"] = "POST",
-			["sdk/latest/version?platform=roblox"] = "GET"
+			--["application/boot_info"] = "GET", -- UNUSED
+			--["users/create"] = "POST", -- UNUSED
+			--["health_check"] = "GET", -- UNUSED
+			--["jobs/create"] = "POST", -- UNUSED
+			["v1/markers"] = "POST",
+			["v1/requests"] = "GET",
+			["v1/requests/completed"] = "POST",
+			["v1/requests/started"] = "PUT",
+			["v1/configurations"] = "GET",
+			["v1/heatmap"] = "POST",
+			["v1/heatmap/waypoint"] = "POST",
+			["v1/latest/version?platform=roblox"] = "GET"
 		}
 	}
 }
@@ -270,7 +271,7 @@ end
 -- Cleans up requests after processing. Can be request or result, just needs requestId field.
 function GBRequests:SendRequestResults(results)
 	-- Sent once per batch
-	self:GBRequestAsync("sdk/requests/completed", results)
+	self:GBRequestAsync("v1/requests/completed", results)
 
 	for _, result in results do
 		local id = result.requestId
@@ -378,7 +379,7 @@ function GBRequests:Init()
 			if not shared.GBMod("HostServer"):IsHostServer() then return end
 
 			-- Get requests from Gamebeast. Soon-to-be legacy?
-			local newRequests, resp = self:GBRequestAsync("sdk/requests")
+			local newRequests, resp = self:GBRequestAsync("v1/requests")
 
 			if not newRequests or not resp or (resp["error"] or resp["StatusCode"] ~= 200) then
 				if tick() - lastReqWarning >= 10 and (resp == nil or resp["StatusCode"] ~= 403) then
@@ -423,7 +424,7 @@ function GBRequests:Init()
 
 				-- Send job started message
 				if isHost then
-					self:GBRequestAsync("sdk/requests/started", {request.requestId})
+					self:GBRequestAsync("v1/requests/started", {request.requestId})
 				end
 
 				if (isHost or request.details.host_authority) and not request.details.hostOnly then
