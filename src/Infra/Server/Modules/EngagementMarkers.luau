@@ -90,7 +90,7 @@ function EngagementMarkers:SendMarkers()
 		}
 
 		MarkerQueue = {}
-		GBRequests:GBRequest("sdk/markers", data)
+		GBRequests:GBRequest("v1/markers", data)
 	end
 end
 
