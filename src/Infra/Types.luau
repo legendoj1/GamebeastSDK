@@ -31,6 +31,10 @@ export type MarkersService = {
 	SendPlayerMarker : (server : MarkersService, player : Player, marker : string, data : JSON, position : Vector3?) -> (),
 }
 
+export type JobsService = {
+	SetCallback : (self : JobsService, jobName : string, callback : (jobData : {[string] : any}) -> (any)) -> ()
+}
+
 export type EventsService = {
 	GetEventData : (self : EventsService, event : string) -> JSON,
 	OnStart : (self : EventsService, event : string, callback : (data : JSON) -> ()) -> RBXScriptConnection,

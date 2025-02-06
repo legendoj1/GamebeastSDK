@@ -41,6 +41,7 @@ local GB_MESSAGING_TOPIC = "GB_REQ_MESSAGE"
 
 --= Variables =--
 
+local CustomJobCallbacks = {}
 local ProcessedUpToRequestId = 0
 local RequestBodyChunkPool = {}
 local RequestResults = {}
@@ -73,8 +74,16 @@ end
 
 --= API Functions =--
 
+function RequestFunctionHandler:SetCallback(customJobName : string, callback : (jobData : {[string] : any}) -> (any))
+    if CustomJobCallbacks[customJobName] then
+        Utilities.GBWarn(`Job name "{customJobName}" already has a callback set, additional sets will overwrite the previous callback.`)
+    end
+
+    CustomJobCallbacks[customJobName] = callback
+end
+
 function RequestFunctionHandler:ExecuteRequests(requests : {})
-    local isHost = HostServer:IsHostServer() 
+    local isHost = HostServer:IsHostServer()
     local LastProcessedUpTo = ProcessedUpToRequestId
     local willStartLoop = #RequestQueue == 0
 
@@ -153,11 +162,16 @@ function RequestFunctionHandler:ExecuteRequests(requests : {})
 
                 -- Process request
                 if not request.details.hostOnly or isHost or request.details.host_authority then
-                    local requestFunc = RequestFunctions.funcs[request.requestType]
-
                     local function performRequest()
+                        local requestFunc;
+                        if request.details.internal then
+                            requestFunc = RequestFunctions.funcs[request.requestType]
+                        else
+                            requestFunc = CustomJobCallbacks[request.requestType]
+                        end
+
                         if not requestFunc then
-                            AddResult(false, request.requestId, {details="request type not found"})
+                            AddResult(false, request.requestId, {details="request callback not found"})
                             return
                         end
 
@@ -166,6 +180,25 @@ function RequestFunctionHandler:ExecuteRequests(requests : {})
                         if not success then
                             AddResult(false, request.requestId, {details=data})
                         else
+                            local responseDataType = type(data)
+
+                            if responseDataType == "userdata" then
+                                data = {
+                                    message = "returned value cannot be a userdata value"
+                                }
+                            elseif responseDataType == "table" then
+                                local canEncode, err = pcall(function()
+                                    HttpService:JSONEncode(data)
+                                end)
+
+                                if not canEncode then
+                                    data = {
+                                        message = "failed to encode returned value",
+                                        encodeError = err
+                                    }
+                                end
+                            end
+
                             AddResult(true, request.requestId, data)
                         end
                     end
