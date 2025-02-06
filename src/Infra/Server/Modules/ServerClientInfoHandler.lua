@@ -19,12 +19,16 @@ local Players = game:GetService("Players")
 --= Dependencies =--
 
 local GetRemote = shared.GBMod("GetRemote")
+local Signal = shared.GBMod("Signal")
+local GBRequests = shared.GBMod("GBRequests") ---@module GBRequests
+local SignalTimeout = shared.GBMod("SignalTimeout") ---@module SignalTimeout
 
 --= Types =--
 
 --= Object References =--
 
 local ClientInfoRemote = GetRemote("Event", "ClientInfoChanged")
+local ClientInfoResolvedSignal = Signal.new()
 
 --= Constants =--
 
@@ -54,25 +58,50 @@ function ServerClientInfoHandler:GetClientInfo(player : Player | number, key : s
     return ClientInfoCache[player][key]
 end
 
+function ServerClientInfoHandler:OnClientInfoResolved(player : Player, timeoutSeconds : number, callback : (timedout : boolean, info : { [string] : any }) -> nil)
+    if ClientInfoCache[player] then
+        callback(false, table.clone(ClientInfoCache[player]))
+        return
+    end
+
+    local timeout = SignalTimeout.new(timeoutSeconds, ClientInfoResolvedSignal, function(resolvedPlayer : Player)
+        return resolvedPlayer == player
+    end)
+
+    return timeout:Once(function(timedout : boolean, info : { [string] : any }?)
+        if timedout or not info then
+            callback(true, table.clone(DEFAULT_INFO))
+        elseif info then
+            callback(false, table.clone(info))
+        end
+    end)
+end
+
 --= Initializers =--
 function ServerClientInfoHandler:Init()
     Players.PlayerRemoving:Connect(function(player : Player)
         ClientInfoCache[player] = nil
     end)
 
-    ClientInfoRemote.OnServerEvent:Connect(function(player : Player, key : string | nil, value : any)
-        if not DEFAULT_INFO[key] then
-            return
+    ClientInfoRemote.OnServerEvent:Connect(function(player : Player, updatedData : { [string] : any })
+        for key in pairs(updatedData) do
+            if not DEFAULT_INFO[key] then
+                return
+            end
         end
-
+ 
+        local isNew = false
         if not ClientInfoCache[player] then
-            ClientInfoCache[player] = {}
+            ClientInfoCache[player] = table.clone(DEFAULT_INFO)
+            isNew = true
         end
 
-        if key then
+        for key, value in pairs(updatedData) do
             ClientInfoCache[player][key] = value
-        else
-            ClientInfoCache[player] = value
+        end
+
+        if isNew then
+            ClientInfoResolvedSignal:Fire(player, ClientInfoCache[player])
         end
     end)
 end
