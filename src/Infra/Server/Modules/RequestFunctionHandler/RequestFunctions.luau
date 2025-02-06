@@ -1,12 +1,10 @@
 -- The Gamebeast SDK is Copyright © 2023 Gamebeast, Inc. to present.
 -- All rights reserved.
 
-local playerService = game:GetService("Players")
-local messagingService = game:GetService("MessagingService")
-local httpService = game:GetService("HttpService")
-local chatService = game:GetService("Chat")
-
-local utilities = shared.GBMod("Utilities")
+local Players = game:GetService("Players")
+local ChatService = game:GetService("Chat")
+local Updater = shared.GBMod("Updater")
+local Utilities = shared.GBMod("Utilities")
 
 -- Header comments provide info on request details sent from backend.
 
@@ -23,7 +21,7 @@ local utilities = shared.GBMod("Utilities")
 -- Functions we define for each request type from the GB dashboard
 local requestFunctions = {}
 
-requestFunctions.funcs = {	
+requestFunctions.funcs = {
 	-- host_only: true
 	-- async: true
 	["Ban"] = function(request)
@@ -34,8 +32,8 @@ requestFunctions.funcs = {
 		-- We support UserIds + usernames from the dashboard
 		if not tonumber(userIdentifier) then
 			-- Get UserId from username
-			userIdentifier, success = utilities.promiseReturn(1, function()
-				return playerService:GetUserIdFromNameAsync(userIdentifier)
+			userIdentifier, success = Utilities.promiseReturn(1, function()
+				return Players:GetUserIdFromNameAsync(userIdentifier)
 			end)
 			
 			-- If the service failed, we can't proceed
@@ -52,14 +50,12 @@ requestFunctions.funcs = {
 		local banTime = args.ban_duration or -1
 		
 		-- Execute ban action
-		local _, success = utilities.promiseReturn(2, function()
-			playerService:BanAsync({UserIds = {userIdentifier}, Duration = banTime, DisplayReason = args.reason, PrivateReason = args.private_reason, ExcludeAltAccounts = args.exclude_alts})
+		local _, success = Utilities.promiseReturn(2, function()
+			Players:BanAsync({UserIds = {userIdentifier}, Duration = banTime, DisplayReason = args.reason, PrivateReason = args.private_reason, ExcludeAltAccounts = args.exclude_alts})
 		end)
 		
 		if not success then
-			shared.GBMod("GBRequests"):SendFailure(request)
-		else
-			shared.GBMod("GBRequests"):SendSuccess(request)
+			error("Failed to ban user")
 		end
 	end;
 	
@@ -73,8 +69,8 @@ requestFunctions.funcs = {
 		-- We support UserIds + usernames from the dashboard
 		if not tonumber(userIdentifier) then
 			-- Get UserId from username
-			userIdentifier, success = utilities.promiseReturn(1, function()
-				return playerService:GetUserIdFromNameAsync(userIdentifier)
+			userIdentifier, success = Utilities.promiseReturn(1, function()
+				return Players:GetUserIdFromNameAsync(userIdentifier)
 			end)
 
 			-- If the service failed, we can't proceed
@@ -88,14 +84,12 @@ requestFunctions.funcs = {
 		end
 		
 		-- Execute unban action
-		local _, success = utilities.promiseReturn(2, function()
-			playerService:UnbanAsync({UserIds = {userIdentifier}})
+		local _, success = Utilities.promiseReturn(2, function()
+			Players:UnbanAsync({UserIds = {userIdentifier}})
 		end)
 
 		if not success then
-			shared.GBMod("GBRequests"):SendFailure(request)
-		else
-			shared.GBMod("GBRequests"):SendSuccess(request)
+			error("Failed to unban user")
 		end
 	end;
 	
@@ -107,40 +101,32 @@ requestFunctions.funcs = {
 		-- We support UserIds + usernames from the dashboard
 		if tonumber(userIdentifier) then
 			--
-			for _, player in playerService:GetPlayers() do
+			for _, player in Players:GetPlayers() do
 				if player.UserId == tonumber(userIdentifier) then
-					local filteredReason = utilities.promiseReturn(1, function()
-						return chatService:FilterStringForBroadcast(args.reason, player)
+					local filteredReason = Utilities.promiseReturn(1, function()
+						return ChatService:FilterStringForBroadcast(args.reason, player)
 					end)
 
 					player:Kick(filteredReason)
 				end
 			end
 		else
-			local player = playerService:FindFirstChild(userIdentifier)
+			local player = Players:FindFirstChild(userIdentifier)
 
 			if player then
-				local filteredReason = utilities.promiseReturn(1, function()
-					return chatService:FilterStringForBroadcast(args.reason, player)
+				local filteredReason = Utilities.promiseReturn(1, function()
+					return ChatService:FilterStringForBroadcast(args.reason, player)
 				end)
 				
 				player:Kick(filteredReason)
 			end
-		end
-		
-		if shared.GBMod("HostServer"):IsHostServer() then
-			shared.GBMod("GBRequests"):SendSuccess(request)
 		end
 	end;
 	
 	-- host_only: false
 	-- async: false
 	["UpdateConfigs"] = function(request)
-		shared.GBMod("Updater"):UpdateConfigs(request.args)
-		
-		if shared.GBMod("HostServer"):IsHostServer() then
-			shared.GBMod("GBRequests"):SendSuccess(request, {})
-		end
+		Updater:UpdateConfigs(request.args)
 	end;
 	
 	-- Not yet implemented
