@@ -257,14 +257,6 @@ function EngagementMarkers:Init()
 			LastCharPositions[player] = position
 		end)
 		
-		-- Get player Login position
-		local char = player.Character or player.CharacterAdded:Wait()
-		local position
-		
-		if char and char.PrimaryPart then
-			position = char.PrimaryPart.Position
-		end
-		
 		-- Send Login marker with relevant session information
 		local loginArgs = {
 			adsAllowed = Utilities.promiseReturn(1, function()
@@ -272,7 +264,7 @@ function EngagementMarkers:Init()
 			end),
 		}
 		
-		self:SDKMarker("Login", loginArgs, {player = player, position = position})
+		self:SDKMarker("Login", loginArgs, {player = player, position = nil})
 	end
 
 	Players.PlayerAdded:Connect(playerAdded)
@@ -282,9 +274,6 @@ function EngagementMarkers:Init()
 
 	Players.PlayerRemoving:Connect(function(player)
 		local userId = player.UserId
-		
-		-- Clear session state
-		SessionIds[userId] = nil
 		
 		-- Collect last position for Logout marker
 		local position = LastCharPositions[player]
@@ -297,6 +286,9 @@ function EngagementMarkers:Init()
 		
 		-- Send Logout marker with relevant info
 		self:SDKMarker("Logout", args, {player = player, position = position})
+
+		-- Clear session state
+		SessionIds[userId] = nil
 		
 		if CharConnections[player] then
 			CharConnections[player]:Disconnect()

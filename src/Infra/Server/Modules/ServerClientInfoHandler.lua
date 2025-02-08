@@ -68,7 +68,7 @@ function ServerClientInfoHandler:OnClientInfoResolved(player : Player, timeoutSe
         return resolvedPlayer == player
     end)
 
-    return timeout:Once(function(timedout : boolean, info : { [string] : any }?)
+    return timeout:Once(function(timedout : boolean, _, info : { [string] : any }?)
         if timedout or not info then
             callback(true, table.clone(DEFAULT_INFO))
         elseif info then

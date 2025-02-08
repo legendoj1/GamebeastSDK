@@ -238,6 +238,7 @@ function RequestFunctionHandler:Init()
 
 	-- Check for new requsts and add to queue loop
 	local lastReqWarning = 0
+    local finalRequest = false
 	task.spawn(function()
 		local function checkForRequests()
 			-- Only host should be asking for requests
@@ -257,14 +258,17 @@ function RequestFunctionHandler:Init()
             self:ExecuteRequests(newRequests)
 		end
 
-		
 		InternalConfigs:OnReady(function()
 			repeat
 				checkForRequests()
 				UPDATE_PERIOD = InternalConfigs:GetActiveConfig("GBConfigs")["GBRates"]["CheckRequests"]
-            until not task.wait(UPDATE_PERIOD)
+            until task.wait(UPDATE_PERIOD) == nil or finalRequest == true
 		end)
 	end)
+
+    GBRequests:OnFinalRequestCall(function()
+        finalRequest = true
+    end)
 end
 
 --= Return Module =--
