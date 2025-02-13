@@ -145,6 +145,7 @@ function EngagementMarkers:_createMarker(source : "server" | "client" | "sdk", m
 		["sessionId"] = player.UserId and SessionIds[player.UserId] or nil,
 		["value"] = value,
 		["properties"] = {
+			["platform"] = "roblox",
 			["origin"] = source,
 			["device"] = nil,
 			["position"] = position ~= nil and EncodeVector3(position) or nil,
