@@ -1,0 +1,199 @@
+--[[
+	The Gamebeast SDK is Copyright © 2023 Gamebeast, Inc. to present.
+	All rights reserved.
+	
+	GBRequests.luau
+	
+	Description:
+		Handles all HTTP requests to the Gamebeast backend.
+	
+--]]
+
+--= Root =--
+local GBRequests = { }
+
+--= Roblox Services =--
+
+local HttpService = game:GetService("HttpService")
+local RunService = game:GetService("RunService")
+
+--= Dependencies =--
+
+local Utilities = shared.GBMod("Utilities")
+local DataCache = shared.GBMod("DataCache")
+local Signal = shared.GBMod("Signal") ---@module Signal
+local MetaData = shared.GBMod("MetaData") ---@module MetaData
+
+--= Types =--
+
+--= Constants =--
+
+local URL_SUFFIX = "/sdk"
+local ENDPOINTS = {
+	{
+		URL = "https://api.gamebeast.gg" .. URL_SUFFIX, -- http://localhost:3001 -- https://api.gamebeast.gg -- https://api.stage.gamebeast.gg
+		Requests = {
+			--["application/boot_info"] = "GET", -- UNUSED
+			--["users/create"] = "POST", -- UNUSED
+			--["health_check"] = "GET", -- UNUSED
+			--["jobs/create"] = "POST", -- UNUSED
+			["v1/markers"] = "POST",
+			["v1/requests"] = "GET",
+			["v1/requests/completed"] = "POST",
+			["v1/requests/started"] = "PUT",
+			["v1/configurations"] = "GET",
+			["v1/heatmap"] = "POST",
+			["v1/heatmap/waypoint"] = "POST",
+			["v1/latest/version?platform=roblox"] = "GET"
+		}
+	}
+}
+
+--= Object References =--
+
+local FinalRequestSignal = Signal.new()
+local RequestProcessingCount = 0
+
+--= Variables =--
+
+local KeyYeildWarning = false
+-- One time warning if requests are failing because of invalid/unset key
+local KeyWarningGiven = false
+
+--= Internal Functions =--
+
+local function GetEndpointForRequest(requestType) : (string?, string?)
+	for _, endpoint in ENDPOINTS do
+		if endpoint.Requests[requestType] then
+			return endpoint.URL, endpoint.Requests[requestType]
+		end
+	end
+end
+
+local function YeildForKey() : string | Secret
+	local start = tick()
+	while not DataCache:Get("Key") do
+		task.wait()
+		if tick() - start > 5 and not KeyYeildWarning then
+			Utilities.GBWarn("Gamebeast key not found! Did you call Gamebeast:Setup()?")
+			KeyYeildWarning = true
+			break
+		end
+	end
+
+	return DataCache:Get("Key")
+end
+
+--= API Functions =--
+
+-- Callback that is fired when the game is shutting down for final request processing.
+function GBRequests:OnFinalRequestCall(callback : () -> ())
+	return FinalRequestSignal:Connect(function()
+		local currentThread = coroutine.running()
+		callback()
+		if currentThread ~= coroutine.running() then
+			error("Final request should not yeild!")
+		end
+	end)
+end
+
+-- Main method for dispatching requests from SDK to backend
+-- Returns parsed body and original response if body can be resolve and response only otherwise
+function GBRequests:GBRequest(requestType : string, args : {[string] : any}) : nil
+	local _, requestsMethod = GetEndpointForRequest(requestType)
+	if requestsMethod ~= "POST" then
+		Utilities.GBWarn("GBRequest should only be used for POST requests. Use GBRequestAsync for other request types.")
+	end
+
+	task.spawn(function()
+		self:GBRequestAsync(requestType, args)
+	end)
+end
+
+--YEILDS 
+function GBRequests:GBRequestAsync(requestType : string, args : {[string] : any}, maxRetries : number?) : any
+	RequestProcessingCount += 1
+	local GBDomain, requestMethod = GetEndpointForRequest(requestType)
+	local response, body
+	args = args or {}
+
+	local partition = shared.GBMod("ABTesting").CUR_PARTITION
+
+	local authKey = YeildForKey()
+
+	-- Define relevant headers. Backend enforces header presence unless specified.
+	local headers = {
+		["authorization"] = authKey,
+		["isstudio"] = tostring(RunService:IsStudio()),
+		["sdkversion"] = MetaData.version,
+		["universeid"] = tostring(game.GameId),
+		-- optional, to be removed with A/B testing overhaul
+		["partitionid"] = partition ~= "" and partition or nil,
+	}
+
+	-- JobId is undefined in studio so send a hard coded default for this environment
+	if headers["isstudio"] then
+		headers["serverid"] = "00000000-0000-0000-0000-000000000000"
+	else
+		headers["serverid"] = game.JobId
+	end
+
+	local url = GBDomain.. "/".. requestType
+
+	if requestMethod == "POST" or requestMethod == "PUT" then
+		body = HttpService:JSONEncode(args)
+		headers["Content-Type"] = "application/json"
+	elseif requestMethod == "GET" then
+		-- Encode args to query string
+		local paramString = "?"
+		for key, val in args do
+			paramString ..= key.. "=".. HttpService:UrlEncode(val).. "&"
+		end
+
+		paramString = string.sub(paramString, 1, #paramString - 1)
+		url ..= paramString
+	end
+
+	-- Send request
+	response = Utilities.promiseReturn(maxRetries or 1, function()
+		return HttpService:RequestAsync({
+			Url = url,
+			Method = requestMethod,
+			Headers = headers,
+			Body = body
+		})
+	end)
+
+	RequestProcessingCount -= 1
+
+	if response and #response.Body > 0 then
+		if (response.StatusCode == 401 or response.StatusCode == 403) and not KeyWarningGiven then
+			Utilities.GBWarn("Gamebeast project key invalid or not set! Set your project key in the :Setup method.")
+			KeyWarningGiven = true
+		end
+
+		-- Decode returned body
+		--print(results)
+		local bodyParsed, success = Utilities.promiseReturn(0, function()
+			return HttpService:JSONDecode(response.Body)
+		end)
+
+		return bodyParsed, response
+	end
+
+	return response
+end
+
+--= Initializers =--
+function GBRequests:Init()
+	game:BindToClose(function()
+		FinalRequestSignal:Fire()
+
+		repeat
+			task.wait()
+		until RequestProcessingCount == 0
+	end)
+end
+
+--= Return Module =--
+return GBRequests

@@ -15,6 +15,7 @@ local ClientInfoHandler = { }
 --= Roblox Services =--
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
+local VRService = game:GetService("VRService")
 
 --= Dependencies =--
 
@@ -37,7 +38,9 @@ local ClientInfoRemote = GetRemote("Event", "ClientInfoChanged")
 --= API Functions =--
 
 function ClientInfoHandler:GetDeviceType() : string
-    if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
+    if UserInputService.VREnabled or VRService.VREnabled then
+        return "vr"
+    elseif UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
 		return "mobile"
 	elseif UserInputService.GamepadEnabled and not UserInputService.KeyboardEnabled then
 		return "console"
@@ -50,7 +53,7 @@ end
 
 --= Initializers =--
 function ClientInfoHandler:Init()
-    ClientInfoRemote:FireServer(nil, {
+    ClientInfoRemote:FireServer({
         device = self:GetDeviceType()
     })
 end

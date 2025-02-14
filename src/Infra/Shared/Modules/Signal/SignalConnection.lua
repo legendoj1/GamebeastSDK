@@ -52,4 +52,6 @@ function SignalConnection:Disconnect()
     self.Connected = false
 end
 
+SignalConnection.Destroy = SignalConnection.Disconnect
+
 return SignalConnection

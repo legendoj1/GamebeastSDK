@@ -16,19 +16,19 @@ local EngagementMarkers = { }
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
-local LocalizationService = game:GetService("LocalizationService")
 local PolicyService = game:GetService("PolicyService")
 
 --= Dependencies =--
 
-local InternalConfigs = shared.GBMod("InternalConfigs") ---@module InternalConfigs
+local MetaData = shared.GBMod("MetaData") ---@module MetaData
 local GetRemote = shared.GBMod("GetRemote")
 local Utilities = shared.GBMod("Utilities")
+local GBRequests = shared.GBMod("GBRequests") ---@module GBRequests
 local PlayerStats = shared.GBMod("PlayerStats") ---@module PlayerStats
+local SocialHandler = shared.GBMod("SocialHandler") ---@module SocialHandler
+local InternalConfigs = shared.GBMod("InternalConfigs") ---@module InternalConfigs
 local LocalizationCache = shared.GBMod("LocalizationCache") ---@module LocalizationCache
 local ServerClientInfoHandler = shared.GBMod("ServerClientInfoHandler") ---@module ServerClientInfoHandler
-local GBRequests = shared.GBMod("GBRequests") ---@module GBRequests
-local SocialHandler = shared.GBMod("SocialHandler") ---@module SocialHandler
 
 
 --= Types =--
@@ -54,6 +54,7 @@ local SYSTEM_MARKERS = {
 
 --= Variables =--
 
+local WaitingPlayerMarkers = {}
 local MarkerQueue = {}
 -- Map of unique session IDs for users for player-associated markers
 local SessionIds = {}
@@ -61,6 +62,7 @@ local SessionIds = {}
 local CharConnections = {}
 local LastCharPositions = {}
 local LastEventReportTime = 0
+local ClientInfoWarned = false
 
 
 --= Public Variables =--
@@ -89,7 +91,7 @@ function EngagementMarkers:SendMarkers()
 		}
 
 		MarkerQueue = {}
-		GBRequests:GBRequest("sdk/markers", data)
+		GBRequests:GBRequest("v1/markers", data)
 	end
 end
 
@@ -132,39 +134,72 @@ function EngagementMarkers:_createMarker(source : "server" | "client" | "sdk", m
 	end
 	
 	-- Interface allows for player instance or userId. We already validated args types, so just handle accordingly.
-	local userId = tonumber(player)
-	
-	if not userId and player then
-		userId = player.UserId
-	end
-	
+	local player = Utilities.resolvePlayerObject(player)
 	
 	-- Marker fields
+	
+
 	local entry = {
 		["timestamp"] = DateTime.now().UnixTimestampMillis,
 		["type"] = markerType,
-		["userId"] = userId,
-		["sessionId"] = userId and SessionIds[userId] or nil,
+		["userId"] = player.UserId, 
+		["sessionId"] = player.UserId and SessionIds[player.UserId] or nil,
 		["value"] = value,
 		["properties"] = {
 			["origin"] = source,
-			["device"] = ServerClientInfoHandler:GetClientInfo(player, "device"),
+			["device"] = nil,
 			["position"] = position ~= nil and EncodeVector3(position) or nil,
 			["localeId"] = player and LocalizationCache:GetLocaleId(player) or nil,
 			["regionId"] = player and LocalizationCache:GetRegionId(player) or nil,
-			["sdkVersion"] = "unknown",
 			-- server A/B testing partition ID if applicable
 			--["partition_id"] = partition ~= "" and partition or nil,
 		},
 		-- server A/B testing partition ID if applicable
 		--["partition_id"] = partition ~= "" and partition or nil,
 	}
+
+	local function addMarker()
+		table.insert(MarkerQueue, entry)
+		
+		-- If marker queue size limit reached then send batch
+		if #MarkerQueue >= MAX_EVENT_QUEUE_SIZE then
+			EngagementMarkers:SendMarkers()
+		end
+	end
 	
-	table.insert(MarkerQueue, entry)
-	
-	-- If marker queue size limit reached then send batch
-	if #MarkerQueue >= MAX_EVENT_QUEUE_SIZE then
-		EngagementMarkers:SendMarkers()
+	if player then -- Ensure marker gets fired with device info on timeout or bind to close
+		local function resolved()
+			entry.properties.device = ServerClientInfoHandler:GetClientInfo(player, "device")
+			addMarker()
+		end
+		
+		local waitingData = {
+			callback = resolved,
+			connection = nil
+		}
+
+		local connection = ServerClientInfoHandler:OnClientInfoResolved(player, 5, function(timedout, ...)
+			if timedout and ClientInfoWarned == false then
+				Utilities.GBWarn("Failed to resolve client info, did you forget to :Setup() Gamebeast SDK on the client?")
+				ClientInfoWarned = true
+			end
+
+			local index = table.find(WaitingPlayerMarkers, waitingData)
+			if index then
+				table.remove(WaitingPlayerMarkers, index)
+			end
+
+			resolved()
+		end)
+
+		if not connection then
+			return
+		end
+
+		waitingData.connection = connection
+		table.insert(WaitingPlayerMarkers, waitingData)
+	else
+		addMarker()
 	end
 end
 
@@ -201,7 +236,6 @@ function EngagementMarkers:Init()
 		
 		-- Track deaths by default
 		player.CharacterAdded:Connect(function(char)
-			local connection
 			local hum = char:FindFirstChildOfClass("Humanoid")
 			
 			if hum then
@@ -224,14 +258,6 @@ function EngagementMarkers:Init()
 			LastCharPositions[player] = position
 		end)
 		
-		-- Get player Login position
-		local char = player.Character or player.CharacterAdded:Wait()
-		local position
-		
-		if char and char.PrimaryPart then
-			position = char.PrimaryPart.Position
-		end
-		
 		-- Send Login marker with relevant session information
 		local loginArgs = {
 			adsAllowed = Utilities.promiseReturn(1, function()
@@ -239,7 +265,7 @@ function EngagementMarkers:Init()
 			end),
 		}
 		
-		self:SDKMarker("Login", loginArgs, {player = player, position = position})
+		self:SDKMarker("Login", loginArgs, {player = player, position = nil})
 	end
 
 	Players.PlayerAdded:Connect(playerAdded)
@@ -249,9 +275,6 @@ function EngagementMarkers:Init()
 
 	Players.PlayerRemoving:Connect(function(player)
 		local userId = player.UserId
-		
-		-- Clear session state
-		SessionIds[userId] = nil
 		
 		-- Collect last position for Logout marker
 		local position = LastCharPositions[player]
@@ -266,6 +289,9 @@ function EngagementMarkers:Init()
 
 		-- Send Logout marker with relevant info
 		self:SDKMarker("Logout", args, {player = player, position = position})
+
+		-- Clear session state
+		SessionIds[userId] = nil
 		
 		if CharConnections[player] then
 			CharConnections[player]:Disconnect()
@@ -290,6 +316,11 @@ function EngagementMarkers:Init()
 	end)
 
 	GBRequests:OnFinalRequestCall(function()
+		for _, waiting in WaitingPlayerMarkers do
+			waiting.connection:Disconnect()
+			waiting.callback()
+		end
+
 		EngagementMarkers:SendMarkers()
 	end)
 end

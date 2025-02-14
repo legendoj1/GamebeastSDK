@@ -47,7 +47,7 @@ end
 --= API Functions =--
 
 function Heatmap:RegisterHeatmap(name : string, positionA : Vector3, positionB : Vector3)
-    GBRequests:GBRequestAsync("sdk/heatmap", {
+    GBRequests:GBRequestAsync("v1/heatmap", {
         ["name"] = name,
         ["positionA"] = RoundVector3(positionA),
         ["positionB"] = RoundVector3(positionB)
@@ -67,7 +67,7 @@ function Heatmap:AddHeatmapWaypoint(heatmapName : string, waypointName : string,
     -- Convert color3 to hex
     appearanceInfo.color = appearanceInfo.color:ToHex()
     
-    GBRequests:GBRequestAsync("sdk/heatmap/waypoint", {
+    GBRequests:GBRequestAsync("v1/heatmap/waypoint", {
         ["heatmapName"] = heatmapName,
         ["waypointName"] = waypointName,
         ["position"] = RoundVector3(position),
