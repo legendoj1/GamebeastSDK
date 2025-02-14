@@ -22,7 +22,6 @@ local LocalizationService = game:GetService("LocalizationService")
 --= Dependencies =--
 
 local Utilities = shared.GBMod("Utilities")
-local InternalConfigs = shared.GBMod("InternalConfigs")
 local EngagementMarkers = shared.GBMod("EngagementMarkers") ---@module Markers
 
 --= Types =--
@@ -43,7 +42,7 @@ local ChatConnections = {}
 
 --= Initializers =--
 function SentimentCapture:Init()
-	Players.PlayerAdded:Connect(function(player)
+	Utilities:OnPlayerAdded(function(player)
 		ChatConnections[player] = player.Chatted:Connect(function(message)
 			local position
 			

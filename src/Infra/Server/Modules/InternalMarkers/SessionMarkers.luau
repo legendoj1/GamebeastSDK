@@ -45,7 +45,7 @@ local LastCharPositions = {}
 
 --= Initializers =--
 function SessionMarkers:Init()
-	local function playerAdded(player : Player)		
+	Utilities:OnPlayerAdded(function(player : Player)
 		-- Track deaths by default
 		player.CharacterAdded:Connect(function(char)
 			local hum = char:FindFirstChildOfClass("Humanoid")
@@ -78,12 +78,7 @@ function SessionMarkers:Init()
 		}
 		
 		EngagementMarkers:SDKMarker("Login", loginArgs, {player = player, position = nil})
-	end
-
-	Players.PlayerAdded:Connect(playerAdded)
-	for _, player in Players:GetPlayers() do
-		task.spawn(playerAdded, player)
-	end
+	end)
 
 	Players.PlayerRemoving:Connect(function(player)		
 		-- Collect last position for Logout marker

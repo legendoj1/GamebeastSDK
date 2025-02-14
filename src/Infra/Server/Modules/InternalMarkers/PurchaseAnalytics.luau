@@ -18,7 +18,7 @@ local MarketplaceService = game:GetService("MarketplaceService")
 
 --= Dependencies =--
 
-local Utilities = shared.GBMod("Utilities")
+local Utilities = shared.GBMod("Utilities") ---@module Utilities
 local EngagementMarkers = shared.GBMod("EngagementMarkers") ---@module Markers
 
 --= Types =--
@@ -46,7 +46,7 @@ local ProductInfoCacheMap = {}
 
 -- Accepts player as player instance or UserId
 local function UpdatePlayerSpend(player, itemId, itemType)
-	local userId = tonumber(player) and player or player.UserId
+	local player = Utilities.resolvePlayerObject(player)
 
 	-- Check if we've already retrieved product info
 	if not ProductInfoCacheMap[itemType] then
@@ -76,7 +76,7 @@ local function UpdatePlayerSpend(player, itemId, itemType)
 	}
 
 	-- Collect where player made purchase
-	local char = player.Character
+	local char = player and player.Character
 	local pos
 	
 	if char and char.PrimaryPart then
