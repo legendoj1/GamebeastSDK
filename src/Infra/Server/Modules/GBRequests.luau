@@ -111,10 +111,10 @@ function GBRequests:GBRequest(requestType : string, args : {[string] : any}) : n
 end
 
 --YEILDS 
-function GBRequests:GBRequestAsync(requestType : string, args : {[string] : any}, maxRetries : number?) : any
+function GBRequests:GBRequestAsync(requestType : string, args : {[string] : any}, maxRetries : number?) : (boolean, any?)
 	RequestProcessingCount += 1
 	local GBDomain, requestMethod = GetEndpointForRequest(requestType)
-	local response, body
+	local requestBody
 	args = args or {}
 
 	local partition = shared.GBMod("ABTesting").CUR_PARTITION
@@ -141,7 +141,7 @@ function GBRequests:GBRequestAsync(requestType : string, args : {[string] : any}
 	local url = GBDomain.. "/".. requestType
 
 	if requestMethod == "POST" or requestMethod == "PUT" then
-		body = HttpService:JSONEncode(args)
+		requestBody = HttpService:JSONEncode(args)
 		headers["Content-Type"] = "application/json"
 	elseif requestMethod == "GET" then
 		-- Encode args to query string
@@ -155,17 +155,18 @@ function GBRequests:GBRequestAsync(requestType : string, args : {[string] : any}
 	end
 
 	-- Send request
-	response = Utilities.promiseReturn(maxRetries or 1, function()
+	local response, requestSuccess = Utilities.promiseReturn(maxRetries or 1, function()
 		return HttpService:RequestAsync({
 			Url = url,
 			Method = requestMethod,
 			Headers = headers,
-			Body = body
+			Body = requestBody
 		})
 	end)
 
 	RequestProcessingCount -= 1
 
+	local success = requestSuccess and response.Success or false
 	if response and #response.Body > 0 then
 		if (response.StatusCode == 401 or response.StatusCode == 403) and not KeyWarningGiven then
 			Utilities.GBWarn("Gamebeast project key invalid or not set! Set your project key in the :Setup method.")
@@ -173,15 +174,18 @@ function GBRequests:GBRequestAsync(requestType : string, args : {[string] : any}
 		end
 
 		-- Decode returned body
-		--print(results)
-		local bodyParsed, success = Utilities.promiseReturn(0, function()
+		local bodyParsed = Utilities.promiseReturn(0, function()
 			return HttpService:JSONDecode(response.Body)
 		end)
 
-		return bodyParsed, response
+		if bodyParsed and bodyParsed.message then
+			Utilities.GBWarn("Request failed: ".. bodyParsed.message)
+		end
+
+		return success, bodyParsed
 	end
 
-	return response
+	return success
 end
 
 --= Initializers =--
