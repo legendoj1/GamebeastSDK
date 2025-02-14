@@ -44,11 +44,6 @@ local ChatConnections = {}
 --= Initializers =--
 function SentimentCapture:Init()
 	Players.PlayerAdded:Connect(function(player)
-		-- Get relevant language settings
-		local translator = Utilities.promiseReturn(1, function()
-			return LocalizationService:GetTranslatorForPlayer(player)
-		end)
-	
 		ChatConnections[player] = player.Chatted:Connect(function(message)
 			local position
 			
