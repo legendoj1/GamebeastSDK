@@ -178,7 +178,7 @@ function GBRequests:GBRequestAsync(requestType : string, args : {[string] : any}
 			return HttpService:JSONDecode(response.Body)
 		end)
 
-		if bodyParsed and bodyParsed.message then
+		if success == false and bodyParsed and bodyParsed.message then
 			Utilities.GBWarn("Request failed: ".. bodyParsed.message)
 		end
 
