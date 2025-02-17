@@ -67,12 +67,12 @@ local function UpdatePlayerSpend(player, itemId, itemType)
 
 	-- Don't send redundant information over the wire
 	local args = {
-		["item_type"] = ENUM_TO_TYPE[itemType] or "unknown",
+		["type"] = ENUM_TO_TYPE[itemType] or "unknown",
 		["id"] = itemId,
 		["price"] = itemInfo.PriceInRobux,
 		["name"] = not wasCached and itemInfo.Name or nil,
 		["description"] = not wasCached and itemInfo.Description or nil,
-		["image_id"] = not wasCached and "https://assetdelivery.roblox.com/v1/asset?id=".. itemId or nil,
+		["imageId"] = not wasCached and "https://assetdelivery.roblox.com/v1/asset?id=".. itemId or nil,
 	}
 
 	-- Collect where player made purchase
