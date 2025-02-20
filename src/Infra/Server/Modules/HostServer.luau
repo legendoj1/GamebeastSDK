@@ -19,7 +19,7 @@ local RunService = game:GetService("RunService")
 
 --= Dependencies =--
 
-local Utilities = shared.GBMod("Utilities")
+local Utilities = shared.GBMod("Utilities") ---@module Utilities
 
 --= Types =--
 
@@ -29,6 +29,7 @@ local Utilities = shared.GBMod("Utilities")
 
 -- Messaging service topics for cross server communication
 local HOST_HEARTBEAT_TOPIC = "GB_HOST_HEARTBEAT"
+local SERVER_SHUTDOWN_TOPIC = "GB_SERVER_SHUTDOWN"
 -- How often we check if no host exists and resolve
 local HEARTBEAT_INTERVAL = 30
 
@@ -45,7 +46,7 @@ local LastHeartbeatSent = os.time()
 --= Internal Functions =--
 
 local function assumeHostServerRole()
-	Utilities.GBWarn("No Gamebeast host server detected - assuming role.")
+	--Utilities.GBWarn("No Gamebeast host server detected - assuming role.")
 	
 	HostServerStatus = true
 end
@@ -86,6 +87,11 @@ end
 --= Initializers =--
 function HostServer:Init()
 	
+	if RunService:IsStudio() then
+		assumeHostServerRole()
+		return
+	end
+
 	-- If ping is received on this channel and it is not from ourself, then another host server exists and we relinquish role
 	local success, reason = pcall(function()
 		MessagingService:SubscribeAsync(HOST_HEARTBEAT_TOPIC, function(message : {Sent : number, Data : {Source : string, NewServer : boolean?}})
@@ -109,11 +115,14 @@ function HostServer:Init()
 			end
 		end)
 	end)
-
-	if RunService:IsStudio() then
-		assumeHostServerRole()
-		return
-	end
+	
+	Utilities.promiseReturn(1, function()
+		MessagingService:SubscribeAsync(SERVER_SHUTDOWN_TOPIC, function(message)
+			if message.Data > ServersSinceStartup then
+				ServersSinceStartup -= 1
+			end
+		end)
+	end)
 
 	if success then
 		RunService.Heartbeat:Connect(function()
@@ -126,6 +135,14 @@ function HostServer:Init()
 		end)
 
 		self:CheckHostServerActive(true)
+
+		game:BindToClose(function(reason)
+			if reason == Enum.CloseReason.DeveloperShutdown or reason == Enum.CloseReason.DeveloperUpdate then
+				return
+			end
+
+			Utilities.publishMessage(SERVER_SHUTDOWN_TOPIC, ServersSinceStartup)
+		end)
 	else
 		Utilities.GBWarn("Failed to subscribe to host heartbeat topic, starting rogue host server...", reason)
 		assumeHostServerRole()
