@@ -13,18 +13,15 @@
 local EngagementMarkers = { }
 
 --= Roblox Services =--
+
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
-local RunService = game:GetService("RunService")
-local PolicyService = game:GetService("PolicyService")
 
 --= Dependencies =--
 
-local MetaData = shared.GBMod("MetaData") ---@module MetaData
 local GetRemote = shared.GBMod("GetRemote")
 local Utilities = shared.GBMod("Utilities")
 local GBRequests = shared.GBMod("GBRequests") ---@module GBRequests
-local PlayerStats = shared.GBMod("PlayerStats") ---@module PlayerStats
 local InternalConfigs = shared.GBMod("InternalConfigs") ---@module InternalConfigs
 local LocalizationCache = shared.GBMod("LocalizationCache") ---@module LocalizationCache
 local ServerClientInfoHandler = shared.GBMod("ServerClientInfoHandler") ---@module ServerClientInfoHandler
@@ -57,9 +54,6 @@ local WaitingPlayerMarkers = {}
 local MarkerQueue = {}
 -- Map of unique session IDs for users for player-associated markers
 local SessionIds = {}
--- Connections for supporting player positions for markers
-local CharConnections = {}
-local LastCharPositions = {}
 local LastEventReportTime = 0
 local ClientInfoWarned = false
 
@@ -146,7 +140,7 @@ function EngagementMarkers:_createMarker(source : "server" | "client" | "sdk", m
 		["value"] = value,
 		["properties"] = {
 			["origin"] = source,
-			["device"] = nil,
+			["device"] = nil, -- Resolved later
 			["position"] = position ~= nil and EncodeVector3(position) or nil,
 			["localeId"] = player and LocalizationCache:GetLocaleId(player) or nil,
 			["regionId"] = player and LocalizationCache:GetRegionId(player) or nil,
@@ -226,45 +220,9 @@ function EngagementMarkers:Init()
 
 		EngagementMarkers:_createMarker("client", markerType, value, metaData)
 	end)]]
-
 	local function playerAdded(player : Player)
-		local userId = player.UserId
-		
 		-- Get unique session ID for user
-		SessionIds[userId] = HttpService:GenerateGUID(false)
-		
-		-- Track deaths by default
-		player.CharacterAdded:Connect(function(char)
-			local hum = char:FindFirstChildOfClass("Humanoid")
-			
-			if hum then
-				CharConnections[player] = hum.Died:Connect(function()
-					local primaryPart = char.PrimaryPart
-					
-					-- Still helpful to tell where players are falling out of the map. Solutions?
-					if primaryPart then
-						self:SDKMarker("Died", nil, {player = player, position = primaryPart.Position})
-						CharConnections[player]:Disconnect()
-						CharConnections[player] = nil
-					end
-				end)
-			end
-		end)
-		
-		-- Collect last position with this event given PlayerRemoving was inconsistent on character still existing for providing position for Logout markers
-		player.CharacterRemoving:Connect(function(char)
-			local position = char.PrimaryPart and char.PrimaryPart.Position or nil
-			LastCharPositions[player] = position
-		end)
-		
-		-- Send Login marker with relevant session information
-		local loginArgs = {
-			adsAllowed = Utilities.promiseReturn(1, function()
-				return PolicyService:GetPolicyInfoForPlayerAsync(player).AreAdsAllowed
-			end),
-		}
-		
-		self:SDKMarker("Login", loginArgs, {player = player, position = nil})
+		SessionIds[player.UserId] = HttpService:GenerateGUID(false)
 	end
 
 	Players.PlayerAdded:Connect(playerAdded)
@@ -273,27 +231,7 @@ function EngagementMarkers:Init()
 	end
 
 	Players.PlayerRemoving:Connect(function(player)
-		local userId = player.UserId
-		
-		-- Collect last position for Logout marker
-		local position = LastCharPositions[player]
-		LastCharPositions[player] = nil
-		
-		-- Compute session length in addition to backend for reasons(?)
-		local args = {
-			["sessionLength"] = Utilities.roundNum(tick() - PlayerStats:GetStat(player, "session_length"), 0.1)
-		}
-		
-		-- Send Logout marker with relevant info
-		self:SDKMarker("Logout", args, {player = player, position = position})
-
-		-- Clear session state
-		SessionIds[userId] = nil
-		
-		if CharConnections[player] then
-			CharConnections[player]:Disconnect()
-			CharConnections[player] = nil
-		end
+		SessionIds[player.UserId] = nil
 	end)
 
 	-- Check if time limit has elapsed and send current data, if any
