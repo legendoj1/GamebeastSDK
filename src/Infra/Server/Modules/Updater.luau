@@ -137,8 +137,8 @@ function Updater:Init()
 
 	-- Check version
 	task.spawn(function()
-		local versionData = GBRequests:GBRequestAsync("v1/latest/version?platform=roblox")
-		if versionData and versionData.version then
+		local success, versionData = GBRequests:GBRequestAsync("v1/latest/version?platform=roblox")
+		if success and versionData.version then
 			if MetaData.version < versionData.version then
 				Utilities.GBWarn(`Gamebeast SDK is out of date! Please update to the latest version. {MetaData.version} -> {versionData.version}`)
 			end
@@ -148,8 +148,8 @@ function Updater:Init()
 	-- Start up, ask for most recent configuations
 
 	local function fetchConfigs()
-		local newConfigsResp, req = GBRequests:GBRequestAsync("v1/configurations", nil, 1)
-		if req and req.StatusCode == 200 then
+		local success, newConfigsResp = GBRequests:GBRequestAsync("v1/configurations", nil, 1)
+		if success then
 			return newConfigsResp.args
 		else
 			return nil

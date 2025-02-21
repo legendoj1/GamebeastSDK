@@ -13,18 +13,16 @@
 local EngagementMarkers = { }
 
 --= Roblox Services =--
+
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
-local PolicyService = game:GetService("PolicyService")
 
 --= Dependencies =--
 
-local MetaData = shared.GBMod("MetaData") ---@module MetaData
 local GetRemote = shared.GBMod("GetRemote")
 local Utilities = shared.GBMod("Utilities")
 local GBRequests = shared.GBMod("GBRequests") ---@module GBRequests
-local PlayerStats = shared.GBMod("PlayerStats") ---@module PlayerStats
 local InternalConfigs = shared.GBMod("InternalConfigs") ---@module InternalConfigs
 local LocalizationCache = shared.GBMod("LocalizationCache") ---@module LocalizationCache
 local ServerClientInfoHandler = shared.GBMod("ServerClientInfoHandler") ---@module ServerClientInfoHandler
@@ -38,6 +36,7 @@ local FireMarkerEvent = GetRemote("Event", "FireMarker")
 
 --= Constants =--
 
+local CLIENT_DATA_TIMEOUT = RunService:IsStudio() and 10 or 45
 local MAX_EVENT_QUEUE_SIZE = 1000
 local QUEUE_CHECK_TIME = 5
 local MAX_EVENT_REPORT_TIME = 10
@@ -57,9 +56,6 @@ local WaitingPlayerMarkers = {}
 local MarkerQueue = {}
 -- Map of unique session IDs for users for player-associated markers
 local SessionIds = {}
--- Connections for supporting player positions for markers
-local CharConnections = {}
-local LastCharPositions = {}
 local LastEventReportTime = 0
 local ClientInfoWarned = false
 
@@ -67,6 +63,14 @@ local ClientInfoWarned = false
 --= Public Variables =--
 
 --= Internal Functions =--
+
+local function GetSessionIdForPlayer(player) : string?
+	if SessionIds[player] == nil and player.Parent then
+		SessionIds[player] = HttpService:GenerateGUID(false)
+	end
+
+	return SessionIds[player]
+end
 
 local function EncodeVector3(vec)
 	local vectorArray = {vec.X, vec.Y, vec.Z}
@@ -141,12 +145,12 @@ function EngagementMarkers:_createMarker(source : "server" | "client" | "sdk", m
 	local entry = {
 		["timestamp"] = DateTime.now().UnixTimestampMillis,
 		["type"] = markerType,
-		["userId"] = player.UserId, 
-		["sessionId"] = player.UserId and SessionIds[player.UserId] or nil,
+		["userId"] = player and player.UserId, 
+		["sessionId"] = player and GetSessionIdForPlayer(player),
 		["value"] = value,
 		["properties"] = {
 			["origin"] = source,
-			["device"] = nil,
+			["device"] = nil, -- Resolved later
 			["position"] = position ~= nil and EncodeVector3(position) or nil,
 			["localeId"] = player and LocalizationCache:GetLocaleId(player) or nil,
 			["regionId"] = player and LocalizationCache:GetRegionId(player) or nil,
@@ -177,7 +181,7 @@ function EngagementMarkers:_createMarker(source : "server" | "client" | "sdk", m
 			connection = nil
 		}
 
-		local connection = ServerClientInfoHandler:OnClientInfoResolved(player, 5, function(timedout, ...)
+		local connection = ServerClientInfoHandler:OnClientInfoResolved(player, CLIENT_DATA_TIMEOUT, function(timedout, ...)
 			if timedout and ClientInfoWarned == false then
 				Utilities.GBWarn("Failed to resolve client info, did you forget to :Setup() Gamebeast SDK on the client?")
 				ClientInfoWarned = true
@@ -213,6 +217,10 @@ function EngagementMarkers:SDKMarker(...)
 	self:_createMarker("sdk", ...)
 end
 
+function EngagementMarkers:ClearSessionId(player : Player)
+	SessionIds[player] = nil
+end
+
 --= Initializers =--
 function EngagementMarkers:Init()
 	--NOTE: Firing markers from client is disabled. Shifting responsibility to the developer for security.
@@ -227,73 +235,10 @@ function EngagementMarkers:Init()
 		EngagementMarkers:_createMarker("client", markerType, value, metaData)
 	end)]]
 
-	local function playerAdded(player : Player)
-		local userId = player.UserId
-		
-		-- Get unique session ID for user
-		SessionIds[userId] = HttpService:GenerateGUID(false)
-		
-		-- Track deaths by default
-		player.CharacterAdded:Connect(function(char)
-			local hum = char:FindFirstChildOfClass("Humanoid")
-			
-			if hum then
-				CharConnections[player] = hum.Died:Connect(function()
-					local primaryPart = char.PrimaryPart
-					
-					-- Still helpful to tell where players are falling out of the map. Solutions?
-					if primaryPart then
-						self:SDKMarker("Died", nil, {player = player, position = primaryPart.Position})
-						CharConnections[player]:Disconnect()
-						CharConnections[player] = nil
-					end
-				end)
-			end
+	Players.ChildRemoved:Connect(function(player)
+		task.defer(function()
+			EngagementMarkers:ClearSessionId(player)
 		end)
-		
-		-- Collect last position with this event given PlayerRemoving was inconsistent on character still existing for providing position for Logout markers
-		player.CharacterRemoving:Connect(function(char)
-			local position = char.PrimaryPart and char.PrimaryPart.Position or nil
-			LastCharPositions[player] = position
-		end)
-		
-		-- Send Login marker with relevant session information
-		local loginArgs = {
-			adsAllowed = Utilities.promiseReturn(1, function()
-				return PolicyService:GetPolicyInfoForPlayerAsync(player).AreAdsAllowed
-			end),
-		}
-		
-		self:SDKMarker("Login", loginArgs, {player = player, position = nil})
-	end
-
-	Players.PlayerAdded:Connect(playerAdded)
-	for _, player in Players:GetPlayers() do
-		task.spawn(playerAdded, player)
-	end
-
-	Players.PlayerRemoving:Connect(function(player)
-		local userId = player.UserId
-		
-		-- Collect last position for Logout marker
-		local position = LastCharPositions[player]
-		LastCharPositions[player] = nil
-		
-		-- Compute session length in addition to backend for reasons(?)
-		local args = {
-			["sessionLength"] = Utilities.roundNum(tick() - PlayerStats:GetStat(player, "session_length"), 0.1)
-		}
-		
-		-- Send Logout marker with relevant info
-		self:SDKMarker("Logout", args, {player = player, position = position})
-
-		-- Clear session state
-		SessionIds[userId] = nil
-		
-		if CharConnections[player] then
-			CharConnections[player]:Disconnect()
-			CharConnections[player] = nil
-		end
 	end)
 
 	-- Check if time limit has elapsed and send current data, if any
