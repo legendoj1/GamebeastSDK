@@ -87,7 +87,7 @@ function SocialHandler:Init()
         CreateCacheEntry(player)
 
         local joinData = player:GetJoinData()
-        if joinData.ReferredByPlayerId then
+        if joinData.ReferredByPlayerId and joinData.ReferredByPlayerId > 0 then
             EngagementMarkers:SDKMarker("JoinedUser", {
                 userId = joinData.ReferredByPlayerId,
             }, { player = player })

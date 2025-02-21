@@ -16,6 +16,7 @@ local EngagementMarkers = { }
 
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
+local RunService = game:GetService("RunService")
 
 --= Dependencies =--
 
@@ -35,6 +36,7 @@ local FireMarkerEvent = GetRemote("Event", "FireMarker")
 
 --= Constants =--
 
+local CLIENT_DATA_TIMEOUT = RunService:IsStudio() and 10 or 45
 local MAX_EVENT_QUEUE_SIZE = 1000
 local QUEUE_CHECK_TIME = 5
 local MAX_EVENT_REPORT_TIME = 10
@@ -61,6 +63,14 @@ local ClientInfoWarned = false
 --= Public Variables =--
 
 --= Internal Functions =--
+
+local function GetSessionIdForPlayer(player) : string?
+	if SessionIds[player] == nil and player.Parent then
+		SessionIds[player] = HttpService:GenerateGUID(false)
+	end
+
+	return SessionIds[player]
+end
 
 local function EncodeVector3(vec)
 	local vectorArray = {vec.X, vec.Y, vec.Z}
@@ -135,8 +145,8 @@ function EngagementMarkers:_createMarker(source : "server" | "client" | "sdk", m
 	local entry = {
 		["timestamp"] = DateTime.now().UnixTimestampMillis,
 		["type"] = markerType,
-		["userId"] = player.UserId, 
-		["sessionId"] = player.UserId and SessionIds[player.UserId] or nil,
+		["userId"] = player and player.UserId, 
+		["sessionId"] = player and GetSessionIdForPlayer(player),
 		["value"] = value,
 		["properties"] = {
 			["origin"] = source,
@@ -171,7 +181,7 @@ function EngagementMarkers:_createMarker(source : "server" | "client" | "sdk", m
 			connection = nil
 		}
 
-		local connection = ServerClientInfoHandler:OnClientInfoResolved(player, 5, function(timedout, ...)
+		local connection = ServerClientInfoHandler:OnClientInfoResolved(player, CLIENT_DATA_TIMEOUT, function(timedout, ...)
 			if timedout and ClientInfoWarned == false then
 				Utilities.GBWarn("Failed to resolve client info, did you forget to :Setup() Gamebeast SDK on the client?")
 				ClientInfoWarned = true
@@ -207,6 +217,10 @@ function EngagementMarkers:SDKMarker(...)
 	self:_createMarker("sdk", ...)
 end
 
+function EngagementMarkers:ClearSessionId(player : Player)
+	SessionIds[player] = nil
+end
+
 --= Initializers =--
 function EngagementMarkers:Init()
 	--NOTE: Firing markers from client is disabled. Shifting responsibility to the developer for security.
@@ -220,18 +234,11 @@ function EngagementMarkers:Init()
 
 		EngagementMarkers:_createMarker("client", markerType, value, metaData)
 	end)]]
-	local function playerAdded(player : Player)
-		-- Get unique session ID for user
-		SessionIds[player.UserId] = HttpService:GenerateGUID(false)
-	end
 
-	Players.PlayerAdded:Connect(playerAdded)
-	for _, player in Players:GetPlayers() do
-		task.spawn(playerAdded, player)
-	end
-
-	Players.PlayerRemoving:Connect(function(player)
-		SessionIds[player.UserId] = nil
+	Players.ChildRemoved:Connect(function(player)
+		task.defer(function()
+			EngagementMarkers:ClearSessionId(player)
+		end)
 	end)
 
 	-- Check if time limit has elapsed and send current data, if any

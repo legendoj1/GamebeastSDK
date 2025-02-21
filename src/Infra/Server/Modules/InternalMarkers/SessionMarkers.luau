@@ -94,7 +94,7 @@ function SessionMarkers:Init()
 
 		-- Send Logout marker with relevant info
 		EngagementMarkers:SDKMarker("Logout", args, {player = player, position = position})
-		
+
 		if CharConnections[player] then
 			CharConnections[player]:Disconnect()
 			CharConnections[player] = nil
