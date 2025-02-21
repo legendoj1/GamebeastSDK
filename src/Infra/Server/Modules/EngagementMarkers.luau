@@ -153,8 +153,8 @@ function EngagementMarkers:_createMarker(source : "server" | "client" | "sdk", m
 			["origin"] = source,
 			["device"] = nil, -- Resolved later
 			["position"] = position ~= nil and EncodeVector3(position) or nil,
-			["localeId"] = player and LocalizationCache:GetLocaleId(player) or nil,
-			["regionId"] = player and LocalizationCache:GetRegionId(player) or nil,
+			["language"] = player and LocalizationCache:GetLocaleId(player) or nil,
+			["country"] = player and LocalizationCache:GetRegionId(player) or nil,
 			-- server A/B testing partition ID if applicable
 			--["partition_id"] = partition ~= "" and partition or nil,
 		},
