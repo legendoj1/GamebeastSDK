@@ -20,6 +20,7 @@ local RunService = game:GetService("RunService")
 
 --= Dependencies =--
 
+local MetaData = shared.GBMod("MetaData")
 local GetRemote = shared.GBMod("GetRemote")
 local Utilities = shared.GBMod("Utilities")
 local GBRequests = shared.GBMod("GBRequests") ---@module GBRequests
@@ -149,7 +150,7 @@ function EngagementMarkers:_createMarker(source : "server" | "client" | "sdk", m
 		["sessionId"] = player and GetSessionIdForPlayer(player),
 		["value"] = value,
 		["properties"] = {
-			["platform"] = "roblox",
+			["sdkPlatform"] = "roblox",
 			["origin"] = source,
 			["device"] = nil, -- Resolved later
 			["position"] = position ~= nil and EncodeVector3(position) or nil,
