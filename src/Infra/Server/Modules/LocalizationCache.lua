@@ -13,9 +13,9 @@
 local LocalizationCache = { }
 
 --= Roblox Services =--
+
 local LocalizationService = game:GetService("LocalizationService")
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 --= Dependencies =--
 
@@ -34,6 +34,11 @@ local Cache = {}
 --= Public Variables =--
 
 --= Internal Functions =--
+
+local function ConvertLocaleToISO(localeId : string) : string
+    local locale = string.split(localeId, "-")
+    return string.lower(locale[1])
+end
 
 --= API Functions =--
 
@@ -71,7 +76,7 @@ function LocalizationCache:GetLocaleId(player : Player | number)
     end
 
     local localeId = Utilities.promiseReturn(1, function()
-        return LocalizationService:GetTranslatorForPlayer(player).LocaleId
+        return ConvertLocaleToISO(LocalizationService:GetTranslatorForPlayerAsync(player).LocaleId)
     end)
 
     if Cache[player] then

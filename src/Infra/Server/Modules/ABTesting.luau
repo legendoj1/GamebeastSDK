@@ -91,6 +91,10 @@ end
 -- Select appropriate config partition, canonical or A/B testing server campaign partition
 
 function ABTesting:GetConfigProfileForServer(newConfigs)
+	if true then 
+		return newConfigs["configs"], ""
+	end
+
 	local numPartitions = self:GetPartitionCount(newConfigs)
 
 	-- No campaign, use canonical
@@ -183,7 +187,7 @@ function ABTesting:Init()
 	-- Tell other servers we exist and start partition self-rebalance loop
 	InternalConfigs:OnReady(function()
 		while task.wait(RandomObject:NextNumber(REBALANCE_CHECK_TIME.Min, REBALANCE_CHECK_TIME.Max)) do
-			checkPartitionDisribution()
+			--checkPartitionDisribution()
 		end
 	end)
 
