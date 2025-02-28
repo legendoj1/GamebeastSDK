@@ -28,7 +28,8 @@ export type ConfigsService = {
 
 export type MarkersService = {
 	SendMarker : (self : MarkersService, marker : string, data : JSON, position : Vector3?) -> (),
-	SendPlayerMarker : (server : MarkersService, player : Player, marker : string, data : JSON, position : Vector3?) -> (),
+	SendPlayerMarker : (self : MarkersService, player : Player, marker : string, data : JSON, position : Vector3?) -> (),
+	SendPurchaseGrantedMarker : (self : MarkersService, recieptInfo : {[string] : number | string}, position : Vector3?) -> (),
 }
 
 export type EventsService = {
