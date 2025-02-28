@@ -270,34 +270,30 @@ function RequestFunctionHandler:Init()
 	end)
 
 	-- Check for new requsts and add to queue loop
-	local lastReqWarning = 0
+    local finalRequest = false
 	task.spawn(function()
 		local function checkForRequests()
 			-- Only host should be asking for requests
 			if not shared.GBMod("HostServer"):IsHostServer() then return end
 
 			-- Get requests from Gamebeast. Soon-to-be legacy?
-			local newRequests, resp = GBRequests:GBRequestAsync("v1/requests")
-
-			if not newRequests or not resp or (resp["error"] or resp["StatusCode"] ~= 200) then
-				if tick() - lastReqWarning >= 10 and (resp == nil or resp["StatusCode"] ~= 403) then
-					Utilities.GBWarn("Issue getting new requests from Gamebeast dashboard. Check status.gamebeast.gg and status.roblox.com.")
-					lastReqWarning = tick()
-				end
-				return
-			end
-
-            self:ExecuteRequests(newRequests)
+			local success, newRequests = GBRequests:GBRequestAsync("v1/requests")
+            if success then
+                self:ExecuteRequests(newRequests)
+            end
 		end
 
-		
 		InternalConfigs:OnReady(function()
 			repeat
 				checkForRequests()
 				UPDATE_PERIOD = InternalConfigs:GetActiveConfig("GBConfigs")["GBRates"]["CheckRequests"]
-            until not task.wait(UPDATE_PERIOD)
+            until task.wait(UPDATE_PERIOD) == nil or finalRequest == true
 		end)
 	end)
+
+    GBRequests:OnFinalRequestCall(function()
+        finalRequest = true
+    end)
 end
 
 --= Return Module =--

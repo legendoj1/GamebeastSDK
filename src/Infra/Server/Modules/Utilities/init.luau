@@ -146,4 +146,12 @@ utilities.publishMessage = function(channel, message)
 	end)
 end
 
+-- Wrapper for player added that ensures players that joined before the signal was attached get passed through the callback.
+function utilities:OnPlayerAdded(callback : (player : Player) -> ())
+	for _, player in pairs(game.Players:GetPlayers()) do
+		task.spawn(callback, player)
+	end
+	return game.Players.PlayerAdded:Connect(callback)
+end
+
 return utilities

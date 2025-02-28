@@ -18,7 +18,7 @@ local MarketplaceService = game:GetService("MarketplaceService")
 
 --= Dependencies =--
 
-local Utilities = shared.GBMod("Utilities")
+local Utilities = shared.GBMod("Utilities") ---@module Utilities
 local EngagementMarkers = shared.GBMod("EngagementMarkers") ---@module Markers
 
 --= Types =--
@@ -46,7 +46,7 @@ local ProductInfoCacheMap = {}
 
 -- Accepts player as player instance or UserId
 local function UpdatePlayerSpend(player, itemId, itemType)
-	local userId = tonumber(player) and player or player.UserId
+	local player = Utilities.resolvePlayerObject(player)
 
 	-- Check if we've already retrieved product info
 	if not ProductInfoCacheMap[itemType] then
@@ -67,16 +67,16 @@ local function UpdatePlayerSpend(player, itemId, itemType)
 
 	-- Don't send redundant information over the wire
 	local args = {
-		["item_type"] = ENUM_TO_TYPE[itemType] or "unknown",
+		["type"] = ENUM_TO_TYPE[itemType] or "unknown",
 		["id"] = itemId,
 		["price"] = itemInfo.PriceInRobux,
 		["name"] = not wasCached and itemInfo.Name or nil,
 		["description"] = not wasCached and itemInfo.Description or nil,
-		["image_id"] = not wasCached and "https://assetdelivery.roblox.com/v1/asset?id=".. itemId or nil,
+		["imageId"] = not wasCached and "https://assetdelivery.roblox.com/v1/asset?id=".. itemId or nil,
 	}
 
 	-- Collect where player made purchase
-	local char = player.Character
+	local char = player and player.Character
 	local pos
 	
 	if char and char.PrimaryPart then
