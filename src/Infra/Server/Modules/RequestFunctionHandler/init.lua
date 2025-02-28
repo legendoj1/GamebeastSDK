@@ -164,10 +164,10 @@ function RequestFunctionHandler:ExecuteRequests(requests : {})
                 if not request.details.hostOnly or isHost or request.details.host_authority then
                     local function performRequest()
                         local requestFunc;
-                        if request.details.internal then
-                            requestFunc = RequestFunctions.funcs[request.requestType]
-                        else
+                        if request.details.custom then
                             requestFunc = CustomJobCallbacks[request.requestType]
+                        else
+                            requestFunc = RequestFunctions.funcs[request.requestType]
                         end
 
                         if not requestFunc then
