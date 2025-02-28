@@ -15,6 +15,7 @@ local PurchaseAnalytics = { }
 --= Roblox Services =--
 
 local MarketplaceService = game:GetService("MarketplaceService")
+local Players = game:GetService("Players")
 
 --= Dependencies =--
 
@@ -27,6 +28,7 @@ local EngagementMarkers = shared.GBMod("EngagementMarkers") ---@module Markers
 
 --= Constants =--
 
+local FLUSH_THRESHOLD = 3
 local ENUM_TO_TYPE = {
 	[Enum.InfoType.GamePass] = "gamepass",
 	[Enum.InfoType.Product] = "devproduct",
@@ -36,33 +38,56 @@ local ENUM_TO_TYPE = {
 
 --= Variables =--
 
--- Cache product information when we see it to save resources
--- New servers will send most up-to-date information, effectively don't have to ever clear cache/get most up-to-date info on a server basis
 local ProductInfoCacheMap = {}
+local UsingProductReceipts = false
+local DevProductEventCache = {}
+local DevProductEventDebounce = {}
 
 --= Public Variables =--
 
 --= Internal Functions =--
 
--- Accepts player as player instance or UserId
-local function UpdatePlayerSpend(player, itemId, itemType)
-	local player = Utilities.resolvePlayerObject(player)
-
+local function GetProductInfo(itemId : number, itemType : Enum.InfoType)
 	-- Check if we've already retrieved product info
 	if not ProductInfoCacheMap[itemType] then
 		ProductInfoCacheMap[itemType] = {}
 	end
 
 	local itemInfo = ProductInfoCacheMap[itemType][itemId]
-	local wasCached = itemInfo ~= nil
-
 	if not itemInfo then
 		itemInfo = Utilities.getProductInfo(itemId, itemType)
 
 		-- In case of service failure even with retries
 		if not itemInfo then return end
-
 		ProductInfoCacheMap[itemType][itemId] = itemInfo
+	end
+
+	return itemInfo
+end
+
+local function FlushProducePurchaseCache(player : Player)
+	local playerCache = DevProductEventCache[player]
+	if not playerCache then
+		return
+	end
+
+	for _, data in ipairs(playerCache) do
+		task.spawn(function()
+			PurchaseAnalytics:UpdatePlayerSpend(player, data.itemId, Enum.InfoType.Product, {position = data.position, timestampOverride = data.timestamp})
+		end)
+	end
+
+	DevProductEventCache[player] = nil
+end
+
+--= API Functions =--
+
+function PurchaseAnalytics:UpdatePlayerSpend(player : Player | number, itemId : number, itemType : Enum.InfoType, metadataOverride : {[string] : any}?)
+	local player = Utilities.resolvePlayerObject(player)
+
+	local itemInfo = GetProductInfo(itemId, itemType)
+	if not itemInfo then
+		return
 	end
 
 	-- Don't send redundant information over the wire
@@ -70,47 +95,78 @@ local function UpdatePlayerSpend(player, itemId, itemType)
 		["type"] = ENUM_TO_TYPE[itemType] or "unknown",
 		["id"] = itemId,
 		["price"] = itemInfo.PriceInRobux,
-		["name"] = not wasCached and itemInfo.Name or nil,
-		["description"] = not wasCached and itemInfo.Description or nil,
-		["imageId"] = not wasCached and "https://assetdelivery.roblox.com/v1/asset?id=".. itemId or nil,
+		["name"] = itemInfo.Name,
+		["description"] = itemInfo.Description,
+		["imageId"] = "https://assetdelivery.roblox.com/v1/asset?id=".. itemId
 	}
 
 	-- Collect where player made purchase
+	local metaData = metadataOverride or {}
+	metaData.player = player
+
 	local char = player and player.Character
-	local pos
-	
-	if char and char.PrimaryPart then
-		pos = char.PrimaryPart.Position
+	if metaData.position == nil and char and char.PrimaryPart then
+		metaData.position = char.PrimaryPart.Position
 	end
 	
-	EngagementMarkers:SDKMarker("Purchase", args, {player = player, position = pos})
+	EngagementMarkers:SDKMarker("Purchase", args, metaData)
 end
 
---= API Functions =--
+function PurchaseAnalytics:DevProductPurchased(fromReceipt : boolean, playerId : number, itemId : number, position : Vector3? )
+	-- If we've validated that the dev is using the method with receipts, we don't need to rely on our internal method
+	if UsingProductReceipts and fromReceipt == false then
+		return
+	end
+
+	-- Ensure the player actually exists
+	local player = Players:GetPlayerByUserId(playerId)
+	if not player then
+		return
+	end
+
+	-- Get the product info ahead of time.
+	local productInfo = GetProductInfo(itemId, Enum.InfoType.Product)
+	if not productInfo then
+		return
+	end
+
+	if fromReceipt then
+		UsingProductReceipts = true
+		DevProductEventCache[player] = nil
+		self:UpdatePlayerSpend(playerId, itemId, Enum.InfoType.Product, {position = position})
+	else
+		DevProductEventCache[player] = DevProductEventCache[player] or {}
+		local playerCache = DevProductEventCache[player]
+
+		table.insert(playerCache, {
+			itemId = itemId, 
+			position = position, 
+			timestamp = DateTime.now().UnixTimestampMillis
+		})
+
+		if #playerCache >= FLUSH_THRESHOLD then
+			FlushProducePurchaseCache(player)
+		end
+	end
+end
 
 --= Initializers =--
 function PurchaseAnalytics:Init()
 	-- Purchase records handler for gamepasses
 	MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(player, gamePassId, wasPurchased)
 		if wasPurchased then
-			UpdatePlayerSpend(player, gamePassId, Enum.InfoType.GamePass)
+			self:UpdatePlayerSpend(player, gamePassId, Enum.InfoType.GamePass)
 		end
-	end)
-
-	-- Purchase records handler for products
-	MarketplaceService.PromptProductPurchaseFinished:Connect(function(playerId, productId, wasPurchased)
-		if wasPurchased then
-			UpdatePlayerSpend(playerId, productId, Enum.InfoType.Product)
-		end	
 	end)
 
 	-- Purchase records handler for assets / other
 	MarketplaceService.PromptPurchaseFinished:Connect(function(player, assetId, wasPurchased)
 		if wasPurchased then
-			UpdatePlayerSpend(player, assetId, Enum.InfoType.Asset)
+			self:UpdatePlayerSpend(player, assetId, Enum.InfoType.Asset)
 		end
 	end)
 
+	-- Purchase records for subscriptions
 	MarketplaceService.PromptSubscriptionPurchaseFinished:Connect(function(player, subscriptionId, didTryPurchasing)
 		if didTryPurchasing then
 			local success, subscriptionStatus = pcall(function()
@@ -118,12 +174,27 @@ function PurchaseAnalytics:Init()
 			end)
 
 			if success and subscriptionStatus.IsSubscribed then
-				UpdatePlayerSpend(player, subscriptionId, Enum.InfoType.Subscription)
+				self:UpdatePlayerSpend(player, subscriptionId, Enum.InfoType.Subscription)
 			end
 		end
-		
 	end)
 
+	-- Purchase records handler for products
+	MarketplaceService.PromptProductPurchaseFinished:Connect(function(playerId : number, productId : number, wasPurchased : boolean)
+		if DevProductEventDebounce[playerId] then
+			return
+		end
+
+		if wasPurchased then
+			DevProductEventDebounce[playerId] = true
+			self:DevProductPurchased(false, playerId, productId)
+
+			task.wait(3)
+			DevProductEventDebounce[playerId] = nil
+		end
+	end)
+
+	Players.PlayerRemoving:Connect(FlushProducePurchaseCache)
 end
 
 --= Return Module =--
