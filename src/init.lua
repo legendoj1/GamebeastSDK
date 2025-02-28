@@ -28,6 +28,7 @@ export type JSON = Types.JSON
 -- Services
 export type ConfigsService = Types.ConfigsService
 export type MarkersService = Types.MarkersService
+export type JobsService = Types.JobsService
 export type EventsService = Types.EventsService
 
 type ModuleData = {

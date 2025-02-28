@@ -32,6 +32,10 @@ export type MarkersService = {
 	SendPurchaseGrantedMarker : (self : MarkersService, recieptInfo : {[string] : number | string}, position : Vector3?) -> (),
 }
 
+export type JobsService = {
+	SetCallback : (self : JobsService, jobName : string, callback : (jobData : {[string] : any}) -> (any)) -> ()
+}
+
 export type EventsService = {
 	GetEventData : (self : EventsService, event : string) -> JSON,
 	OnStart : (self : EventsService, event : string, callback : (data : JSON) -> ()) -> RBXScriptConnection,
