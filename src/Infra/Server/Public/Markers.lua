@@ -13,11 +13,13 @@
 local Markers = { }
 
 --= Roblox Services =--
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Players = game:GetService("Players")
 
 --= Dependencies =--
 
 local EngagementMarkers = shared.GBMod("EngagementMarkers") ---@module EngagementMarkers
+local PurchaseAnalytics = shared.GBMod("PurchaseAnalytics") ---@module PurchaseAnalytics
 
 --= Types =--
 
@@ -39,6 +41,17 @@ end
 
 function Markers:SendPlayerMarker(player : Player, markerType : string, value : number | {[string] : any}, position : Vector3?)
     EngagementMarkers:FireMarker(markerType, value, {player = player, position = position})
+end
+
+-- Sends an internal Purchase marker for dev products.
+function Markers:SendNewPurchaseGrantedMarker(recieptInfo : {[string] : number | string}, position : Vector3?)
+    if not Players:GetPlayerByUserId(recieptInfo.PlayerId) then
+        return false
+    end
+
+    task.spawn(function()
+        PurchaseAnalytics:DevProductPurchased(true, recieptInfo.PlayerId, recieptInfo.ProductId, position)
+    end)
 end
 
 --= Return Module =--

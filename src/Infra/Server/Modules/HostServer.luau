@@ -118,8 +118,8 @@ function HostServer:Init()
 	
 	Utilities.promiseReturn(1, function()
 		MessagingService:SubscribeAsync(SERVER_SHUTDOWN_TOPIC, function(message)
-			if message.Data > ServersSinceStartup then
-				ServersSinceStartup -= 1
+			if message.Data < ServersSinceStartup then
+				ServersSinceStartup = math.max(ServersSinceStartup - 1, 0)
 			end
 		end)
 	end)
