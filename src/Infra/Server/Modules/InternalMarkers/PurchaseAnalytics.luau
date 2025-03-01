@@ -65,7 +65,7 @@ local function GetProductInfo(itemId : number, itemType : Enum.InfoType)
 	return itemInfo
 end
 
-local function FlushProducePurchaseCache(player : Player)
+local function FlushProductPurchaseCache(player : Player)
 	local playerCache = DevProductEventCache[player]
 	if not playerCache then
 		return
@@ -145,7 +145,7 @@ function PurchaseAnalytics:DevProductPurchased(fromReceipt : boolean, playerId :
 		})
 
 		if #playerCache >= FLUSH_THRESHOLD then
-			FlushProducePurchaseCache(player)
+			FlushProductPurchaseCache(player)
 		end
 	end
 end
@@ -194,7 +194,7 @@ function PurchaseAnalytics:Init()
 		end
 	end)
 
-	Players.PlayerRemoving:Connect(FlushProducePurchaseCache)
+	Players.PlayerRemoving:Connect(FlushProductPurchaseCache)
 end
 
 --= Return Module =--
