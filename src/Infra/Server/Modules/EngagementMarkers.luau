@@ -185,8 +185,10 @@ function EngagementMarkers:_createMarker(source : "server" | "client" | "sdk", m
 
 		local connection = ServerClientInfoHandler:OnClientInfoResolved(player, CLIENT_DATA_TIMEOUT, function(timedout, ...)
 			if timedout and ClientInfoWarned == false then
-				Utilities.GBWarn("Failed to resolve client info, did you forget to :Setup() Gamebeast SDK on the client?")
-				ClientInfoWarned = true
+				if player.Parent then
+					Utilities.GBWarn("Failed to resolve client info, did you forget to :Setup() Gamebeast SDK on the client?")
+					ClientInfoWarned = true
+				end
 			end
 
 			local index = table.find(WaitingPlayerMarkers, waitingData)
